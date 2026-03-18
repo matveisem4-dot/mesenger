@@ -1,0 +1,3591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MeshCipher — Private Mesh Messenger</title>
+
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+<!-- GSAP -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/CustomEase.min.js"></script>
+
+<!-- PeerJS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js"></script>
+
+<style>
+/* ============================================================
+   DESIGN SYSTEM — CSS CUSTOM PROPERTIES
+   ============================================================ */
+:root {
+  /* Core Palette */
+  --obsidian-0:   #08080c;
+  --obsidian-1:   #0d0d14;
+  --obsidian-2:   #12121c;
+  --obsidian-3:   #17171f;
+  --obsidian-4:   #1c1c28;
+  --obsidian-5:   #22222f;
+  --obsidian-6:   #2a2a3c;
+
+  --glass-bg:     rgba(18,18,28, 0.72);
+  --glass-bg-lt:  rgba(30,30,48, 0.55);
+  --glass-border: rgba(120,120,200, 0.12);
+  --glass-border-bright: rgba(150,150,255, 0.22);
+
+  /* Accent System */
+  --accent-primary:   #7c6ef7;
+  --accent-secondary: #5fc8f5;
+  --accent-tertiary:  #f06292;
+  --accent-success:   #4fcf8a;
+  --accent-warning:   #f9c846;
+  --accent-danger:    #f25f5c;
+
+  /* Glow colors */
+  --glow-primary:   rgba(124,110,247,0.35);
+  --glow-secondary: rgba(95,200,245,0.28);
+  --glow-success:   rgba(79,207,138,0.30);
+  --glow-danger:    rgba(242,95,92,0.30);
+
+  /* Typography */
+  --font-display: 'Syne', sans-serif;
+  --font-mono:    'DM Mono', monospace;
+
+  /* Sizing */
+  --sidebar-w:     300px;
+  --topbar-h:      58px;
+  --radius-sm:     8px;
+  --radius-md:     14px;
+  --radius-lg:     20px;
+  --radius-xl:     28px;
+
+  /* Blur */
+  --blur-glass:    blur(22px) saturate(180%);
+  --blur-heavy:    blur(40px) saturate(200%);
+
+  /* Transitions */
+  --ease-spring:   cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-smooth:   cubic-bezier(0.4, 0, 0.2, 1);
+  --dur-fast:      160ms;
+  --dur-mid:       280ms;
+  --dur-slow:      480ms;
+}
+
+/* ============================================================
+   RESET & BASE
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  background: var(--obsidian-0);
+  color: #e8e8f4;
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--obsidian-6); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--accent-primary); }
+
+::selection { background: rgba(124,110,247,0.35); color: #fff; }
+
+/* ============================================================
+   CANVAS BACKGROUND
+   ============================================================ */
+#bg-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* ============================================================
+   APP SHELL
+   ============================================================ */
+#app {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: var(--sidebar-w) 1fr;
+  grid-template-rows: var(--topbar-h) 1fr;
+  height: 100vh;
+  width: 100vw;
+  transition: grid-template-columns var(--dur-slow) var(--ease-smooth);
+}
+
+#app.sidebar-hidden {
+  grid-template-columns: 0px 1fr;
+}
+
+/* ============================================================
+   TOP BAR
+   ============================================================ */
+#topbar {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 20px 0 16px;
+  background: var(--glass-bg);
+  backdrop-filter: var(--blur-glass);
+  -webkit-backdrop-filter: var(--blur-glass);
+  border-bottom: 1px solid var(--glass-border);
+  z-index: 100;
+}
+
+#topbar-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.logo-mark {
+  width: 32px; height: 32px;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.logo-mark svg {
+  width: 100%; height: 100%;
+  filter: drop-shadow(0 0 8px var(--accent-primary));
+}
+
+#topbar-brand {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  background: linear-gradient(135deg, #fff 0%, var(--accent-primary) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+#topbar-divider {
+  width: 1px;
+  height: 24px;
+  background: var(--glass-border-bright);
+  flex-shrink: 0;
+}
+
+/* My peer ID badge */
+#my-peer-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  border-radius: var(--radius-sm);
+  background: rgba(124,110,247,0.08);
+  border: 1px solid rgba(124,110,247,0.18);
+  cursor: pointer;
+  transition: all var(--dur-fast) var(--ease-smooth);
+  position: relative;
+  overflow: hidden;
+}
+
+#my-peer-badge::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, transparent, rgba(124,110,247,0.06));
+  opacity: 0;
+  transition: opacity var(--dur-fast);
+}
+
+#my-peer-badge:hover::before { opacity: 1; }
+#my-peer-badge:hover { border-color: rgba(124,110,247,0.35); }
+
+#my-peer-badge .badge-label {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(200,200,240,0.5);
+}
+
+#my-peer-id-text {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--accent-primary);
+  letter-spacing: 0.03em;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#copy-id-btn {
+  opacity: 0.5;
+  font-size: 11px;
+  transition: opacity var(--dur-fast);
+}
+#my-peer-badge:hover #copy-id-btn { opacity: 1; }
+
+/* Connection status indicator */
+#conn-status {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11.5px;
+  color: rgba(200,200,240,0.55);
+  margin-left: auto;
+}
+
+.status-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--accent-danger);
+  box-shadow: 0 0 0 0 var(--glow-danger);
+  transition: all 0.4s;
+}
+
+.status-dot.online {
+  background: var(--accent-success);
+  box-shadow: 0 0 0 3px rgba(79,207,138,0.12);
+  animation: pulse-dot 2.5s infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(79,207,138,0.4); }
+  50%       { box-shadow: 0 0 0 5px rgba(79,207,138,0); }
+}
+
+/* Topbar actions */
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 12px;
+}
+
+.topbar-btn {
+  width: 34px; height: 34px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: 1px solid var(--glass-border);
+  color: rgba(200,200,240,0.6);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--dur-fast) var(--ease-smooth);
+  font-size: 15px;
+  position: relative;
+  overflow: hidden;
+}
+
+.topbar-btn:hover {
+  background: var(--glass-bg-lt);
+  border-color: var(--glass-border-bright);
+  color: #fff;
+  box-shadow: 0 0 0 1px rgba(124,110,247,0.1), 0 4px 16px rgba(0,0,0,0.3);
+}
+
+.topbar-btn.active {
+  background: rgba(124,110,247,0.15);
+  border-color: rgba(124,110,247,0.35);
+  color: var(--accent-primary);
+}
+
+#sidebar-toggle-btn { flex-shrink: 0; }
+
+/* ============================================================
+   SIDEBAR
+   ============================================================ */
+#sidebar {
+  grid-row: 2;
+  display: flex;
+  flex-direction: column;
+  background: var(--glass-bg);
+  backdrop-filter: var(--blur-glass);
+  -webkit-backdrop-filter: var(--blur-glass);
+  border-right: 1px solid var(--glass-border);
+  overflow: hidden;
+  position: relative;
+}
+
+.sidebar-section-title {
+  font-size: 10px;
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(200,200,240,0.35);
+  padding: 14px 16px 8px;
+}
+
+/* Connect Panel */
+#connect-panel {
+  padding: 12px;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.connect-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.glass-input {
+  flex: 1;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: var(--radius-sm);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--glass-border);
+  color: #e8e8f4;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  outline: none;
+  transition: all var(--dur-fast) var(--ease-smooth);
+  letter-spacing: 0.02em;
+}
+
+.glass-input::placeholder { color: rgba(200,200,240,0.25); }
+
+.glass-input:focus {
+  border-color: rgba(124,110,247,0.45);
+  background: rgba(124,110,247,0.06);
+  box-shadow: 0 0 0 3px rgba(124,110,247,0.08), inset 0 0 0 1px rgba(124,110,247,0.06);
+}
+
+.glass-btn {
+  height: 36px;
+  padding: 0 14px;
+  border-radius: var(--radius-sm);
+  background: rgba(124,110,247,0.18);
+  border: 1px solid rgba(124,110,247,0.35);
+  color: var(--accent-primary);
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: all var(--dur-fast) var(--ease-smooth);
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+  overflow: hidden;
+}
+
+.glass-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, transparent 100%);
+}
+
+.glass-btn:hover {
+  background: rgba(124,110,247,0.28);
+  border-color: rgba(124,110,247,0.55);
+  box-shadow: 0 0 16px var(--glow-primary), 0 4px 16px rgba(0,0,0,0.3);
+  transform: translateY(-1px);
+}
+
+.glass-btn:active { transform: translateY(0); }
+
+.glass-btn.danger {
+  background: rgba(242,95,92,0.12);
+  border-color: rgba(242,95,92,0.30);
+  color: var(--accent-danger);
+}
+
+.glass-btn.danger:hover {
+  background: rgba(242,95,92,0.22);
+  border-color: rgba(242,95,92,0.50);
+  box-shadow: 0 0 16px var(--glow-danger);
+}
+
+.glass-btn.success {
+  background: rgba(79,207,138,0.12);
+  border-color: rgba(79,207,138,0.30);
+  color: var(--accent-success);
+}
+
+/* Contacts List */
+#contacts-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 8px;
+}
+
+.contact-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--dur-fast) var(--ease-smooth);
+  position: relative;
+  overflow: hidden;
+  border: 1px solid transparent;
+  margin-bottom: 2px;
+}
+
+.contact-item::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--glass-bg-lt);
+  opacity: 0;
+  transition: opacity var(--dur-fast);
+  border-radius: inherit;
+}
+
+.contact-item:hover::before { opacity: 1; }
+
+.contact-item.active {
+  background: rgba(124,110,247,0.10);
+  border-color: rgba(124,110,247,0.20);
+  box-shadow: inset 0 0 20px rgba(124,110,247,0.05);
+}
+
+.contact-item.active::before { opacity: 0; }
+
+.contact-avatar {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--obsidian-5), var(--obsidian-6));
+  border: 1px solid var(--glass-border-bright);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.contact-avatar-inner {
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.contact-presence {
+  position: absolute;
+  bottom: 1px; right: 1px;
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  border: 1.5px solid var(--obsidian-2);
+}
+
+.contact-presence.online { background: var(--accent-success); }
+.contact-presence.offline { background: rgba(200,200,240,0.2); }
+.contact-presence.calling { background: var(--accent-warning); animation: pulse-dot 1s infinite; }
+
+.contact-info { flex: 1; min-width: 0; }
+
+.contact-name {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 600;
+  color: #e8e8f4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.contact-meta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 2px;
+}
+
+.contact-last-msg {
+  font-size: 11px;
+  color: rgba(200,200,240,0.4);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+}
+
+.contact-unread {
+  min-width: 18px; height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--accent-primary);
+  font-size: 10px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  flex-shrink: 0;
+  box-shadow: 0 0 8px rgba(124,110,247,0.5);
+}
+
+/* Sidebar bottom actions */
+#sidebar-bottom {
+  padding: 12px;
+  border-top: 1px solid var(--glass-border);
+  display: flex;
+  gap: 8px;
+}
+
+/* ============================================================
+   MAIN CHAT AREA
+   ============================================================ */
+#main {
+  grid-row: 2;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Chat header */
+#chat-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 20px;
+  height: 56px;
+  border-bottom: 1px solid var(--glass-border);
+  background: rgba(12,12,20,0.5);
+  backdrop-filter: blur(12px);
+  flex-shrink: 0;
+}
+
+#chat-peer-info { flex: 1; }
+
+#chat-peer-name {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+}
+
+#chat-peer-status {
+  font-size: 11px;
+  color: rgba(200,200,240,0.45);
+  margin-top: 1px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+#chat-peer-status .enc-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(79,207,138,0.1);
+  border: 1px solid rgba(79,207,138,0.2);
+  color: var(--accent-success);
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  font-weight: 500;
+}
+
+.chat-header-actions {
+  display: flex;
+  gap: 6px;
+}
+
+/* ============================================================
+   MESSAGES AREA
+   ============================================================ */
+#messages-wrap {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  scroll-behavior: smooth;
+}
+
+/* Empty state */
+#empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 20px;
+  user-select: none;
+  pointer-events: none;
+}
+
+.empty-icon {
+  width: 72px; height: 72px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, rgba(124,110,247,0.18), rgba(12,12,24,0.4));
+  border: 1px solid rgba(124,110,247,0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  filter: drop-shadow(0 0 20px rgba(124,110,247,0.2));
+}
+
+.empty-title {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  color: rgba(200,200,240,0.4);
+  text-align: center;
+}
+
+.empty-sub {
+  font-size: 12px;
+  color: rgba(200,200,240,0.2);
+  text-align: center;
+  max-width: 260px;
+  line-height: 1.6;
+}
+
+/* Date separator */
+.msg-date-sep {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0 8px;
+}
+
+.msg-date-sep::before,
+.msg-date-sep::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--glass-border);
+}
+
+.msg-date-sep span {
+  font-size: 10.5px;
+  color: rgba(200,200,240,0.28);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* Message bubbles */
+.msg-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 75%;
+}
+
+.msg-group.outgoing { align-self: flex-end; align-items: flex-end; }
+.msg-group.incoming { align-self: flex-start; align-items: flex-start; }
+
+.msg-sender {
+  font-family: var(--font-display);
+  font-size: 10.5px;
+  font-weight: 600;
+  color: rgba(200,200,240,0.4);
+  padding: 0 4px;
+  letter-spacing: 0.04em;
+}
+
+.msg-bubble {
+  padding: 9px 14px;
+  border-radius: var(--radius-md);
+  position: relative;
+  word-break: break-word;
+  line-height: 1.5;
+  font-size: 13.5px;
+  cursor: default;
+  transition: all var(--dur-fast) var(--ease-smooth);
+  max-width: 100%;
+}
+
+.msg-bubble:hover {
+  transform: translateY(-1px);
+}
+
+/* Outgoing bubble */
+.msg-group.outgoing .msg-bubble {
+  background: linear-gradient(135deg, rgba(124,110,247,0.22) 0%, rgba(100,90,220,0.18) 100%);
+  border: 1px solid rgba(124,110,247,0.25);
+  color: #e8e8f4;
+  border-bottom-right-radius: 4px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.25), 0 0 0 0 var(--glow-primary);
+}
+
+.msg-group.outgoing .msg-bubble:hover {
+  box-shadow: 0 6px 24px rgba(0,0,0,0.3), 0 0 12px rgba(124,110,247,0.12);
+}
+
+/* Incoming bubble */
+.msg-group.incoming .msg-bubble {
+  background: rgba(255,255,255,0.042);
+  border: 1px solid var(--glass-border);
+  color: #d8d8ec;
+  border-bottom-left-radius: 4px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.20);
+}
+
+.msg-group.incoming .msg-bubble:hover {
+  background: rgba(255,255,255,0.058);
+  box-shadow: 0 6px 24px rgba(0,0,0,0.25);
+}
+
+/* First/last bubble radius adjustments */
+.msg-group.outgoing .msg-bubble:not(:last-child):not(:first-child) { border-radius: var(--radius-md); border-bottom-right-radius: 4px; }
+.msg-group.outgoing .msg-bubble:first-child:not(:last-child)       { border-radius: var(--radius-md); border-bottom-right-radius: 4px; }
+.msg-group.incoming .msg-bubble:not(:last-child):not(:first-child) { border-radius: var(--radius-md); border-bottom-left-radius: 4px; }
+.msg-group.incoming .msg-bubble:first-child:not(:last-child)       { border-radius: var(--radius-md); border-bottom-left-radius: 4px; }
+
+/* Message meta */
+.msg-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 4px;
+  margin-top: 1px;
+}
+
+.msg-time {
+  font-size: 10px;
+  color: rgba(200,200,240,0.28);
+  letter-spacing: 0.03em;
+}
+
+.msg-status {
+  font-size: 11px;
+  color: rgba(200,200,240,0.28);
+}
+
+.msg-status.delivered { color: var(--accent-secondary); }
+.msg-status.read      { color: var(--accent-primary); }
+
+/* Burn / self-destruct timer badge */
+.burn-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 20px;
+  background: rgba(242,95,92,0.12);
+  border: 1px solid rgba(242,95,92,0.25);
+  color: var(--accent-danger);
+  font-size: 10px;
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  margin-top: 4px;
+}
+
+.burn-badge .burn-icon { animation: flicker 1.2s ease-in-out infinite; }
+
+@keyframes flicker {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.5; }
+}
+
+/* Burn overlay */
+.msg-bubble.burning {
+  animation: burnAway 0.8s ease-in forwards;
+}
+
+@keyframes burnAway {
+  0%   { opacity: 1; filter: none; transform: translateY(0) scale(1); }
+  60%  { opacity: 0.6; filter: brightness(2) saturate(3); transform: translateY(-2px) scale(1.02); }
+  100% { opacity: 0; filter: blur(8px) brightness(3); transform: translateY(-10px) scale(0.95); }
+}
+
+/* System message */
+.msg-system {
+  align-self: center;
+  font-size: 11px;
+  color: rgba(200,200,240,0.32);
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  padding: 5px 14px;
+  margin: 8px 0;
+  letter-spacing: 0.02em;
+}
+
+/* File message */
+.msg-file {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  background: rgba(95,200,245,0.06);
+  border: 1px solid rgba(95,200,245,0.15);
+  min-width: 220px;
+  cursor: pointer;
+  transition: all var(--dur-fast);
+}
+
+.msg-file:hover {
+  background: rgba(95,200,245,0.1);
+  border-color: rgba(95,200,245,0.25);
+}
+
+.file-icon { font-size: 26px; flex-shrink: 0; }
+
+.file-info { flex: 1; min-width: 0; }
+
+.file-name {
+  font-size: 12.5px;
+  color: #e8e8f4;
+  font-family: var(--font-display);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-size {
+  font-size: 10.5px;
+  color: rgba(200,200,240,0.4);
+  margin-top: 2px;
+}
+
+.file-progress {
+  width: 100%;
+  height: 3px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 2px;
+  margin-top: 6px;
+  overflow: hidden;
+}
+
+.file-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-secondary), var(--accent-primary));
+  border-radius: 2px;
+  transition: width 0.3s ease;
+  box-shadow: 0 0 6px rgba(95,200,245,0.5);
+}
+
+/* ============================================================
+   INPUT AREA
+   ============================================================ */
+#input-area {
+  padding: 14px 20px;
+  border-top: 1px solid var(--glass-border);
+  background: rgba(12,12,20,0.6);
+  backdrop-filter: blur(12px);
+  flex-shrink: 0;
+}
+
+#input-options {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.input-opt-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  border: 1px solid var(--glass-border);
+  background: transparent;
+  color: rgba(200,200,240,0.4);
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--dur-fast);
+  letter-spacing: 0.03em;
+}
+
+.input-opt-btn:hover {
+  border-color: rgba(124,110,247,0.35);
+  color: var(--accent-primary);
+  background: rgba(124,110,247,0.08);
+}
+
+.input-opt-btn.active {
+  border-color: rgba(242,95,92,0.35);
+  color: var(--accent-danger);
+  background: rgba(242,95,92,0.08);
+}
+
+#burn-timer-picker {
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(242,95,92,0.3);
+  color: var(--accent-danger);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  outline: none;
+  cursor: pointer;
+  display: none;
+}
+
+#burn-timer-picker.visible { display: block; }
+
+#burn-timer-picker option { background: var(--obsidian-3); }
+
+#input-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+#msg-input {
+  flex: 1;
+  min-height: 44px;
+  max-height: 140px;
+  padding: 11px 14px;
+  border-radius: var(--radius-md);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--glass-border);
+  color: #e8e8f4;
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  outline: none;
+  resize: none;
+  line-height: 1.5;
+  transition: all var(--dur-fast) var(--ease-smooth);
+  letter-spacing: 0.01em;
+  overflow-y: auto;
+}
+
+#msg-input::placeholder { color: rgba(200,200,240,0.22); }
+
+#msg-input:focus {
+  border-color: rgba(124,110,247,0.4);
+  background: rgba(124,110,247,0.04);
+  box-shadow: 0 0 0 3px rgba(124,110,247,0.07);
+}
+
+#send-btn {
+  width: 44px; height: 44px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--accent-primary), #5a4fcf);
+  border: none;
+  color: #fff;
+  font-size: 17px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--dur-fast) var(--ease-smooth);
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(124,110,247,0.35);
+}
+
+#send-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.15), transparent);
+  opacity: 0;
+  transition: opacity var(--dur-fast);
+}
+
+#send-btn:hover {
+  transform: translateY(-2px) scale(1.04);
+  box-shadow: 0 8px 24px rgba(124,110,247,0.5);
+}
+
+#send-btn:hover::before { opacity: 1; }
+#send-btn:active { transform: scale(0.97); }
+
+/* ============================================================
+   DRAG & DROP OVERLAY
+   ============================================================ */
+#drop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  background: rgba(8,8,12,0.88);
+  backdrop-filter: blur(18px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-mid) var(--ease-smooth);
+}
+
+#drop-overlay.visible {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.drop-icon {
+  font-size: 56px;
+  animation: floatUpDown 2s ease-in-out infinite;
+}
+
+@keyframes floatUpDown {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-10px); }
+}
+
+.drop-title {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.5px;
+}
+
+.drop-sub {
+  font-size: 13px;
+  color: rgba(200,200,240,0.5);
+}
+
+.drop-zone-ring {
+  position: absolute;
+  width: 200px; height: 200px;
+  border-radius: 50%;
+  border: 1px solid rgba(124,110,247,0.2);
+  animation: ringExpand 2s ease-out infinite;
+}
+
+.drop-zone-ring:nth-child(2) { animation-delay: 0.66s; }
+.drop-zone-ring:nth-child(3) { animation-delay: 1.33s; }
+
+@keyframes ringExpand {
+  0%   { transform: scale(0.3); opacity: 0.8; }
+  100% { transform: scale(3);   opacity: 0; }
+}
+
+/* ============================================================
+   MODAL OVERLAYS
+   ============================================================ */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 800;
+  background: rgba(5,5,10,0.75);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-mid);
+}
+
+.modal-backdrop.visible {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.modal-box {
+  background: var(--glass-bg);
+  backdrop-filter: var(--blur-heavy);
+  -webkit-backdrop-filter: var(--blur-heavy);
+  border: 1px solid var(--glass-border-bright);
+  border-radius: var(--radius-xl);
+  padding: 28px 30px;
+  min-width: 360px;
+  max-width: 500px;
+  width: 90%;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.03);
+  transform: scale(0.94) translateY(10px);
+  transition: transform var(--dur-mid) var(--ease-spring);
+}
+
+.modal-backdrop.visible .modal-box {
+  transform: scale(1) translateY(0);
+}
+
+.modal-title {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.3px;
+  margin-bottom: 6px;
+}
+
+.modal-sub {
+  font-size: 12px;
+  color: rgba(200,200,240,0.45);
+  margin-bottom: 20px;
+  line-height: 1.6;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 22px;
+  justify-content: flex-end;
+}
+
+.modal-close {
+  position: absolute;
+  top: 14px; right: 14px;
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--glass-border);
+  color: rgba(200,200,240,0.5);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  transition: all var(--dur-fast);
+}
+
+.modal-close:hover {
+  background: rgba(242,95,92,0.15);
+  border-color: rgba(242,95,92,0.3);
+  color: var(--accent-danger);
+}
+
+/* ============================================================
+   CALL UI OVERLAY
+   ============================================================ */
+#call-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 700;
+  background: rgba(5,5,10,0.92);
+  backdrop-filter: blur(30px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-slow);
+}
+
+#call-overlay.visible {
+  opacity: 1;
+  pointer-events: all;
+}
+
+#call-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+
+#call-avatar {
+  width: 110px; height: 110px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, rgba(124,110,247,0.4), rgba(12,12,24,0.6));
+  border: 2px solid rgba(124,110,247,0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: 40px;
+  font-weight: 800;
+  background-clip: text;
+  position: relative;
+  box-shadow: 0 0 0 0 rgba(124,110,247,0.4);
+  animation: callPulse 2s ease-out infinite;
+}
+
+@keyframes callPulse {
+  0%   { box-shadow: 0 0 0 0 rgba(124,110,247,0.4); }
+  70%  { box-shadow: 0 0 0 30px rgba(124,110,247,0); }
+  100% { box-shadow: 0 0 0 0 rgba(124,110,247,0); }
+}
+
+#call-peer-name {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.5px;
+}
+
+#call-status-text {
+  font-size: 13px;
+  color: rgba(200,200,240,0.5);
+  letter-spacing: 0.04em;
+}
+
+#call-timer {
+  font-family: var(--font-mono);
+  font-size: 20px;
+  color: var(--accent-success);
+  letter-spacing: 0.1em;
+  display: none;
+}
+
+.call-actions {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.call-btn {
+  width: 60px; height: 60px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  transition: all var(--dur-fast) var(--ease-spring);
+}
+
+.call-btn:hover { transform: scale(1.12); }
+.call-btn:active { transform: scale(0.95); }
+
+.call-btn.hangup { background: var(--accent-danger); box-shadow: 0 0 20px var(--glow-danger); }
+.call-btn.mute   { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); }
+.call-btn.video  { background: rgba(95,200,245,0.15); border: 1px solid rgba(95,200,245,0.25); color: var(--accent-secondary); }
+
+/* ============================================================
+   TOAST NOTIFICATIONS
+   ============================================================ */
+#toast-container {
+  position: fixed;
+  top: 70px; right: 20px;
+  z-index: 900;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  background: var(--glass-bg);
+  backdrop-filter: var(--blur-glass);
+  border: 1px solid var(--glass-border-bright);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  font-size: 12.5px;
+  color: #e8e8f4;
+  min-width: 240px;
+  max-width: 340px;
+  transform: translateX(120%);
+  pointer-events: all;
+  transition: transform var(--dur-mid) var(--ease-spring);
+}
+
+.toast.visible { transform: translateX(0); }
+
+.toast-icon { font-size: 16px; flex-shrink: 0; }
+
+.toast-msg { flex: 1; line-height: 1.4; }
+
+.toast.info   { border-left: 3px solid var(--accent-secondary); }
+.toast.success{ border-left: 3px solid var(--accent-success); }
+.toast.warning{ border-left: 3px solid var(--accent-warning); }
+.toast.error  { border-left: 3px solid var(--accent-danger); }
+
+/* ============================================================
+   TYPING INDICATOR
+   ============================================================ */
+.typing-indicator {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  background: rgba(255,255,255,0.042);
+  border: 1px solid var(--glass-border);
+  width: fit-content;
+}
+
+.typing-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: rgba(200,200,240,0.4);
+  animation: typingBounce 1.2s ease-in-out infinite;
+}
+
+.typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes typingBounce {
+  0%, 80%, 100% { transform: scale(0.8); opacity: 0.5; }
+  40%           { transform: scale(1.2); opacity: 1; }
+}
+
+/* ============================================================
+   ENCRYPTION KEY INFO PANEL
+   ============================================================ */
+#key-panel {
+  padding: 10px 12px;
+  margin: 8px 12px;
+  border-radius: var(--radius-md);
+  background: rgba(79,207,138,0.05);
+  border: 1px solid rgba(79,207,138,0.12);
+  display: none;
+}
+
+#key-panel.visible { display: block; }
+
+.key-panel-title {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent-success);
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.key-fingerprint {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: rgba(79,207,138,0.6);
+  word-break: break-all;
+  line-height: 1.5;
+  letter-spacing: 0.04em;
+}
+
+/* ============================================================
+   SCROLLBAR HIDING UTILITY
+   ============================================================ */
+.hide-scroll {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.hide-scroll::-webkit-scrollbar { display: none; }
+
+/* ============================================================
+   ANIMATIONS & UTILITIES
+   ============================================================ */
+.fade-in  { animation: fadeIn  var(--dur-mid) var(--ease-smooth) forwards; }
+.slide-up { animation: slideUp var(--dur-mid) var(--ease-spring) forwards; }
+
+@keyframes fadeIn  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+
+.no-select { user-select: none; }
+
+.shimmer {
+  background: linear-gradient(90deg, var(--obsidian-4), var(--obsidian-6), var(--obsidian-4));
+  background-size: 300%;
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0%   { background-position: 100%; }
+  100% { background-position: 0%; }
+}
+
+/* ============================================================
+   WELCOME SCREEN  (first launch)
+   ============================================================ */
+#welcome-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 600;
+  background: var(--obsidian-0);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 32px;
+  transition: opacity var(--dur-slow) var(--ease-smooth);
+}
+
+#welcome-screen.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.welcome-logo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.welcome-logo-mark {
+  width: 72px; height: 72px;
+  position: relative;
+}
+
+.welcome-logo-mark svg { width: 100%; height: 100%; }
+
+.welcome-title {
+  font-family: var(--font-display);
+  font-size: 36px;
+  font-weight: 800;
+  letter-spacing: -1px;
+  background: linear-gradient(135deg, #fff 30%, var(--accent-primary) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.welcome-tagline {
+  font-size: 13.5px;
+  color: rgba(200,200,240,0.45);
+  letter-spacing: 0.04em;
+  text-align: center;
+  max-width: 320px;
+  line-height: 1.6;
+}
+
+.welcome-card {
+  background: var(--glass-bg);
+  backdrop-filter: var(--blur-glass);
+  border: 1px solid var(--glass-border-bright);
+  border-radius: var(--radius-xl);
+  padding: 32px;
+  width: 380px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-shadow: 0 32px 80px rgba(0,0,0,0.7);
+}
+
+.welcome-card label {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(200,200,240,0.5);
+  display: block;
+  margin-bottom: 6px;
+}
+
+.welcome-note {
+  font-size: 11px;
+  color: rgba(200,200,240,0.3);
+  line-height: 1.6;
+  text-align: center;
+}
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media (max-width: 680px) {
+  #app {
+    grid-template-columns: 100vw;
+    grid-template-rows: var(--topbar-h) auto 1fr;
+  }
+
+  #sidebar {
+    grid-row: auto;
+    height: 220px;
+    border-right: none;
+    border-bottom: 1px solid var(--glass-border);
+  }
+}
+</style>
+</head>
+<body>
+
+<!-- ================================================================
+     CANVAS BACKGROUND
+     ================================================================ -->
+<canvas id="bg-canvas"></canvas>
+
+<!-- ================================================================
+     WELCOME / ONBOARDING SCREEN
+     ================================================================ -->
+<div id="welcome-screen">
+  <div class="welcome-logo">
+    <div class="welcome-logo-mark">
+      <svg viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="wg1" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#7c6ef7"/>
+            <stop offset="100%" stop-color="#5fc8f5"/>
+          </linearGradient>
+        </defs>
+        <circle cx="36" cy="36" r="34" stroke="url(#wg1)" stroke-width="1.5" fill="none" opacity="0.3"/>
+        <circle cx="36" cy="36" r="24" stroke="url(#wg1)" stroke-width="1" fill="none" opacity="0.5"/>
+        <!-- mesh nodes -->
+        <circle cx="36" cy="14" r="4" fill="url(#wg1)"/>
+        <circle cx="57" cy="47" r="4" fill="url(#wg1)"/>
+        <circle cx="15" cy="47" r="4" fill="url(#wg1)"/>
+        <!-- mesh lines -->
+        <line x1="36" y1="14" x2="57" y2="47" stroke="url(#wg1)" stroke-width="1.2" opacity="0.7"/>
+        <line x1="57" y1="47" x2="15" y2="47" stroke="url(#wg1)" stroke-width="1.2" opacity="0.7"/>
+        <line x1="15" y1="47" x2="36" y2="14" stroke="url(#wg1)" stroke-width="1.2" opacity="0.7"/>
+        <!-- center -->
+        <circle cx="36" cy="36" r="5" fill="url(#wg1)" opacity="0.9"/>
+        <line x1="36" y1="14" x2="36" y2="36" stroke="url(#wg1)" stroke-width="0.8" opacity="0.4"/>
+        <line x1="57" y1="47" x2="36" y2="36" stroke="url(#wg1)" stroke-width="0.8" opacity="0.4"/>
+        <line x1="15" y1="47" x2="36" y2="36" stroke="url(#wg1)" stroke-width="0.8" opacity="0.4"/>
+      </svg>
+    </div>
+    <div class="welcome-title">MeshCipher</div>
+    <div class="welcome-tagline">End-to-end encrypted peer-to-peer messaging. No servers. No logs. No trace.</div>
+  </div>
+
+  <div class="welcome-card">
+    <div>
+      <label>Your Display Name</label>
+      <input id="welcome-name" class="glass-input" style="width:100%;" placeholder="e.g. Ghost_7734" maxlength="32" autocomplete="off" />
+    </div>
+    <div>
+      <label>Custom Peer ID <span style="opacity:0.4; font-size:10px; text-transform:none;">(optional — leave blank to auto-generate)</span></label>
+      <input id="welcome-peer-id" class="glass-input" style="width:100%;" placeholder="e.g. my-secret-node-42" maxlength="48" autocomplete="off" />
+    </div>
+    <button class="glass-btn" id="welcome-launch-btn" style="width:100%; justify-content:center; height:44px; font-size:14px;">
+      <span>⬡</span> Initialize Node
+    </button>
+    <div class="welcome-note">Your peer ID is derived locally. Anthropic's servers are never involved in message routing.</div>
+  </div>
+</div>
+
+<!-- ================================================================
+     MAIN APP SHELL
+     ================================================================ -->
+<div id="app">
+
+  <!-- TOP BAR -->
+  <header id="topbar">
+    <button class="topbar-btn" id="sidebar-toggle-btn" title="Toggle Sidebar">☰</button>
+
+    <div id="topbar-logo">
+      <div class="logo-mark">
+        <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="lg1" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#7c6ef7"/>
+              <stop offset="100%" stop-color="#5fc8f5"/>
+            </linearGradient>
+          </defs>
+          <circle cx="16" cy="6"  r="3.5" fill="url(#lg1)"/>
+          <circle cx="27" cy="24" r="3.5" fill="url(#lg1)"/>
+          <circle cx="5"  cy="24" r="3.5" fill="url(#lg1)"/>
+          <line x1="16" y1="6"  x2="27" y2="24" stroke="url(#lg1)" stroke-width="1.3" opacity="0.8"/>
+          <line x1="27" y1="24" x2="5"  y2="24" stroke="url(#lg1)" stroke-width="1.3" opacity="0.8"/>
+          <line x1="5"  y1="24" x2="16" y2="6"  stroke="url(#lg1)" stroke-width="1.3" opacity="0.8"/>
+          <circle cx="16" cy="16" r="3" fill="url(#lg1)" opacity="0.7"/>
+        </svg>
+      </div>
+      <div id="topbar-brand">MeshCipher</div>
+    </div>
+
+    <div id="topbar-divider"></div>
+
+    <div id="my-peer-badge" title="Click to copy your Peer ID">
+      <div class="badge-label">My Node</div>
+      <div id="my-peer-id-text">Initializing…</div>
+      <div id="copy-id-btn">⎘</div>
+    </div>
+
+    <div id="conn-status">
+      <div class="status-dot" id="status-dot"></div>
+      <span id="status-text">Offline</span>
+    </div>
+
+    <div class="topbar-actions">
+      <button class="topbar-btn" id="call-audio-btn" title="Voice Call">🎤</button>
+      <button class="topbar-btn" id="call-video-btn" title="Video Call">📹</button>
+      <button class="topbar-btn" id="settings-btn"   title="Settings">⚙</button>
+    </div>
+  </header>
+
+  <!-- SIDEBAR -->
+  <aside id="sidebar">
+    <div class="sidebar-section-title">Connect to Peer</div>
+
+    <div id="connect-panel">
+      <div class="connect-row">
+        <input id="peer-id-input" class="glass-input" placeholder="Enter remote peer ID…" autocomplete="off" />
+        <button class="glass-btn" id="connect-btn"><span>⬡</span> Connect</button>
+      </div>
+    </div>
+
+    <!-- Encryption key info -->
+    <div id="key-panel">
+      <div class="key-panel-title">🔐 E2E Encrypted Session</div>
+      <div class="key-fingerprint" id="key-fingerprint">—</div>
+    </div>
+
+    <div class="sidebar-section-title">Contacts</div>
+
+    <div id="contacts-list" class="hide-scroll">
+      <!-- Populated dynamically -->
+    </div>
+
+    <div id="sidebar-bottom">
+      <button class="glass-btn danger" id="disconnect-btn" style="flex:1; justify-content:center;">✕ Disconnect</button>
+    </div>
+  </aside>
+
+  <!-- MAIN CHAT -->
+  <main id="main">
+
+    <!-- Chat Header -->
+    <div id="chat-header">
+      <div id="chat-peer-info">
+        <div id="chat-peer-name">Select a peer</div>
+        <div id="chat-peer-status">
+          <span>No active connection</span>
+        </div>
+      </div>
+      <div class="chat-header-actions">
+        <button class="topbar-btn" id="burn-all-btn" title="Burn All Messages">🔥</button>
+        <button class="topbar-btn" id="export-btn"   title="Export Chat Log">⬇</button>
+      </div>
+    </div>
+
+    <!-- Messages -->
+    <div id="messages-wrap">
+      <div id="empty-state">
+        <div class="empty-icon">⬡</div>
+        <div class="empty-title">No messages yet</div>
+        <div class="empty-sub">Connect to a peer node to begin an encrypted session. All traffic is AES-256-GCM encrypted.</div>
+      </div>
+    </div>
+
+    <!-- Typing indicator (hidden initially) -->
+    <div id="typing-row" style="padding: 4px 24px 0; display:none;">
+      <div class="typing-indicator">
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+      </div>
+    </div>
+
+    <!-- Input Area -->
+    <div id="input-area">
+      <div id="input-options">
+        <button class="input-opt-btn" id="burn-toggle-btn">🔥 Burn after read</button>
+        <select id="burn-timer-picker">
+          <option value="5">5 s</option>
+          <option value="10">10 s</option>
+          <option value="30" selected>30 s</option>
+          <option value="60">1 min</option>
+          <option value="300">5 min</option>
+        </select>
+        <button class="input-opt-btn" id="file-btn">📎 File</button>
+        <input id="file-input" type="file" style="display:none;" multiple />
+      </div>
+      <div id="input-row">
+        <textarea id="msg-input" placeholder="Compose encrypted message…" rows="1"></textarea>
+        <button id="send-btn" title="Send (Enter)">➤</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ================================================================
+     CALL OVERLAY
+     ================================================================ -->
+<div id="call-overlay">
+  <div id="call-box">
+    <div class="drop-zone-ring"></div>
+    <div class="drop-zone-ring"></div>
+    <div class="drop-zone-ring"></div>
+    <div id="call-avatar"><span id="call-avatar-text">?</span></div>
+    <div id="call-peer-name">Unknown</div>
+    <div id="call-status-text">Calling…</div>
+    <div id="call-timer">00:00</div>
+    <div class="call-actions">
+      <button class="call-btn mute"   id="call-mute-btn"   title="Mute">🎤</button>
+      <button class="call-btn hangup" id="call-hangup-btn" title="Hang up">📵</button>
+      <button class="call-btn video"  id="call-video-toggle-btn" title="Toggle video">📹</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================================
+     DROP OVERLAY
+     ================================================================ -->
+<div id="drop-overlay">
+  <div class="drop-zone-ring"></div>
+  <div class="drop-zone-ring"></div>
+  <div class="drop-zone-ring"></div>
+  <div class="drop-icon">📁</div>
+  <div class="drop-title">Drop to send securely</div>
+  <div class="drop-sub">File will be encrypted before transfer</div>
+</div>
+
+<!-- ================================================================
+     TOAST CONTAINER
+     ================================================================ -->
+<div id="toast-container"></div>
+
+
+<!-- ================================================================
+     JAVASCRIPT — MODULAR ARCHITECTURE
+     ================================================================ -->
+<script>
+'use strict';
+
+/* ================================================================
+   MODULE: Config  —  Application-wide constants
+   ================================================================ */
+const Config = Object.freeze({
+  APP_NAME:          'MeshCipher',
+  VERSION:           '1.0.0',
+  HEARTBEAT_MS:      15_000,          // keep-alive interval
+  TYPING_DEBOUNCE:   1_200,           // ms before "typing" event stops
+  MAX_FILE_BYTES:    64 * 1024 * 1024,// 64 MB
+  CHUNK_SIZE:        16 * 1024,       // 16 KB per file chunk
+  PEER_CONFIG: {
+    debug: 0,
+    config: {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+      ]
+    }
+  },
+  CRYPTO: {
+    ALGO:    'AES-GCM',
+    KEYLEN:  256,
+    IVLEN:   12,     // bytes
+    TAGLEN:  128,    // bits (auth tag)
+    ECDH:    'P-256',
+    HASH:    'SHA-256',
+  },
+  MSG_TYPES: {
+    TEXT:        'TEXT',
+    FILE_META:   'FILE_META',
+    FILE_CHUNK:  'FILE_CHUNK',
+    FILE_END:    'FILE_END',
+    HANDSHAKE:   'HANDSHAKE',
+    HANDSHAKE_ACK: 'HANDSHAKE_ACK',
+    HEARTBEAT:   'HEARTBEAT',
+    TYPING:      'TYPING',
+    BURN:        'BURN',
+    CALL_OFFER:  'CALL_OFFER',
+    CALL_ANSWER: 'CALL_ANSWER',
+    CALL_REJECT: 'CALL_REJECT',
+    CALL_HANGUP: 'CALL_HANGUP',
+  },
+});
+
+/* ================================================================
+   MODULE: Utils  —  General helper functions
+   ================================================================ */
+const Utils = {
+  /** Generate a UUID v4 */
+  uuid() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+      const r = (Math.random() * 16) | 0;
+      return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+    });
+  },
+
+  /** Short ID (8 chars) */
+  shortId() {
+    return Math.random().toString(36).slice(2, 10).toUpperCase();
+  },
+
+  /** Format bytes to human-readable */
+  formatBytes(bytes) {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  },
+
+  /** Format seconds to MM:SS */
+  formatDuration(sec) {
+    const m = Math.floor(sec / 60).toString().padStart(2, '0');
+    const s = (sec % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
+  },
+
+  /** Format timestamp */
+  formatTime(ts) {
+    return new Date(ts).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  },
+
+  /** Format date for separator */
+  formatDate(ts) {
+    const d = new Date(ts);
+    const today = new Date();
+    if (d.toDateString() === today.toDateString()) return 'Today';
+    const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
+    if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  },
+
+  /** ArrayBuffer → Base64 */
+  bufToBase64(buffer) {
+    return btoa(String.fromCharCode(...new Uint8Array(buffer)));
+  },
+
+  /** Base64 → ArrayBuffer */
+  base64ToBuf(b64) {
+    const bin = atob(b64);
+    const buf = new ArrayBuffer(bin.length);
+    const view = new Uint8Array(buf);
+    for (let i = 0; i < bin.length; i++) view[i] = bin.charCodeAt(i);
+    return buf;
+  },
+
+  /** ArrayBuffer → Hex string */
+  bufToHex(buffer) {
+    return [...new Uint8Array(buffer)].map(b => b.toString(16).padStart(2, '0')).join('');
+  },
+
+  /** Escape HTML entities */
+  escapeHtml(str) {
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  },
+
+  /** Detect file type icon */
+  fileIcon(name) {
+    const ext = name.split('.').pop().toLowerCase();
+    const map = {
+      pdf: '📄', doc: '📝', docx: '📝', txt: '📝',
+      jpg: '🖼', jpeg: '🖼', png: '🖼', gif: '🖼', svg: '🖼', webp: '🖼',
+      mp4: '🎬', mov: '🎬', avi: '🎬', mkv: '🎬',
+      mp3: '🎵', wav: '🎵', flac: '🎵', ogg: '🎵',
+      zip: '📦', rar: '📦', gz: '📦', tar: '📦',
+      js: '📜', ts: '📜', py: '📜', html: '📜', css: '📜',
+    };
+    return map[ext] || '📁';
+  },
+
+  /** Debounce */
+  debounce(fn, ms) {
+    let t;
+    return (...args) => {
+      clearTimeout(t);
+      t = setTimeout(() => fn(...args), ms);
+    };
+  },
+
+  /** Clamp a value */
+  clamp(v, min, max) { return Math.min(Math.max(v, min), max); },
+};
+
+/* ================================================================
+   MODULE: EventBus  —  Simple pub/sub for module communication
+   ================================================================ */
+class EventBus {
+  constructor() { this._subs = new Map(); }
+
+  on(event, cb) {
+    if (!this._subs.has(event)) this._subs.set(event, new Set());
+    this._subs.get(event).add(cb);
+    return () => this._subs.get(event).delete(cb);
+  }
+
+  emit(event, data) {
+    if (!this._subs.has(event)) return;
+    this._subs.get(event).forEach(cb => {
+      try { cb(data); } catch (e) { console.error(`[EventBus] Error in "${event}":`, e); }
+    });
+  }
+
+  once(event, cb) {
+    const off = this.on(event, data => { cb(data); off(); });
+  }
+}
+
+const Bus = new EventBus();
+
+/* ================================================================
+   MODULE: CryptoEngine  —  E2E encryption via Web Crypto API
+   Implements ECDH key exchange + AES-GCM message encryption
+   ================================================================ */
+class CryptoEngine {
+  constructor() {
+    this._keyPair     = null;  // Our ECDH key pair
+    this._sharedKey   = null;  // AES-GCM derived key
+    this._peerPubKey  = null;  // Remote's public key (CryptoKey)
+    this._fingerprint = null;  // Hex fingerprint of shared secret
+    this._ready       = false;
+  }
+
+  /** Generate our ECDH key pair */
+  async init() {
+    this._keyPair = await crypto.subtle.generateKey(
+      { name: 'ECDH', namedCurve: Config.CRYPTO.ECDH },
+      true,
+      ['deriveKey', 'deriveBits']
+    );
+    console.log('[Crypto] Key pair generated');
+    return this;
+  }
+
+  /** Export our public key as Base64 JWK for transmission */
+  async exportPublicKey() {
+    const raw = await crypto.subtle.exportKey('raw', this._keyPair.publicKey);
+    return Utils.bufToBase64(raw);
+  }
+
+  /** Import peer's public key from Base64 */
+  async importPeerPublicKey(b64) {
+    const raw = Utils.base64ToBuf(b64);
+    this._peerPubKey = await crypto.subtle.importKey(
+      'raw', raw,
+      { name: 'ECDH', namedCurve: Config.CRYPTO.ECDH },
+      false,
+      []
+    );
+    await this._deriveSharedKey();
+  }
+
+  /** Derive AES-GCM key from ECDH shared secret */
+  async _deriveSharedKey() {
+    // First get raw bits for fingerprint
+    const bits = await crypto.subtle.deriveBits(
+      { name: 'ECDH', public: this._peerPubKey },
+      this._keyPair.privateKey,
+      256
+    );
+
+    // Fingerprint from shared bits
+    const hashBuf = await crypto.subtle.digest('SHA-256', bits);
+    this._fingerprint = Utils.bufToHex(hashBuf).match(/.{4}/g).join(' ');
+
+    // Derive AES-GCM key
+    this._sharedKey = await crypto.subtle.deriveKey(
+      { name: 'ECDH', public: this._peerPubKey },
+      this._keyPair.privateKey,
+      { name: Config.CRYPTO.ALGO, length: Config.CRYPTO.KEYLEN },
+      false,
+      ['encrypt', 'decrypt']
+    );
+
+    this._ready = true;
+    Bus.emit('crypto:ready', { fingerprint: this._fingerprint });
+    console.log('[Crypto] Shared key derived. Fingerprint:', this._fingerprint);
+  }
+
+  get isReady()     { return this._ready; }
+  get fingerprint() { return this._fingerprint; }
+
+  /** Encrypt plaintext → { iv: b64, ct: b64 } */
+  async encrypt(text) {
+    if (!this._ready) throw new Error('Crypto not ready');
+    const iv  = crypto.getRandomValues(new Uint8Array(Config.CRYPTO.IVLEN));
+    const enc = new TextEncoder().encode(text);
+    const ct  = await crypto.subtle.encrypt(
+      { name: Config.CRYPTO.ALGO, iv, tagLength: Config.CRYPTO.TAGLEN },
+      this._sharedKey,
+      enc
+    );
+    return {
+      iv: Utils.bufToBase64(iv.buffer),
+      ct: Utils.bufToBase64(ct),
+    };
+  }
+
+  /** Decrypt { iv, ct } → plaintext */
+  async decrypt({ iv, ct }) {
+    if (!this._ready) throw new Error('Crypto not ready');
+    const ivBuf  = Utils.base64ToBuf(iv);
+    const ctBuf  = Utils.base64ToBuf(ct);
+    const plain  = await crypto.subtle.decrypt(
+      { name: Config.CRYPTO.ALGO, iv: ivBuf, tagLength: Config.CRYPTO.TAGLEN },
+      this._sharedKey,
+      ctBuf
+    );
+    return new TextDecoder().decode(plain);
+  }
+
+  /** Encrypt a raw ArrayBuffer (for file chunks) */
+  async encryptBuffer(buffer) {
+    if (!this._ready) throw new Error('Crypto not ready');
+    const iv  = crypto.getRandomValues(new Uint8Array(Config.CRYPTO.IVLEN));
+    const ct  = await crypto.subtle.encrypt(
+      { name: Config.CRYPTO.ALGO, iv, tagLength: Config.CRYPTO.TAGLEN },
+      this._sharedKey,
+      buffer
+    );
+    return { iv: Utils.bufToBase64(iv.buffer), ct: Utils.bufToBase64(ct) };
+  }
+
+  /** Decrypt → raw ArrayBuffer */
+  async decryptBuffer({ iv, ct }) {
+    if (!this._ready) throw new Error('Crypto not ready');
+    const ivBuf = Utils.base64ToBuf(iv);
+    const ctBuf = Utils.base64ToBuf(ct);
+    return crypto.subtle.decrypt(
+      { name: Config.CRYPTO.ALGO, iv: ivBuf, tagLength: Config.CRYPTO.TAGLEN },
+      this._sharedKey,
+      ctBuf
+    );
+  }
+
+  /** Reset for new session */
+  reset() {
+    this._sharedKey   = null;
+    this._peerPubKey  = null;
+    this._fingerprint = null;
+    this._ready       = false;
+  }
+}
+
+/* ================================================================
+   MODULE: MessageStore  —  In-memory message history per peer
+   ================================================================ */
+class MessageStore {
+  constructor() {
+    /** Map<peerId, Message[]> */
+    this._store = new Map();
+    /** Map<msgId, burnTimer> */
+    this._burnTimers = new Map();
+  }
+
+  /** Ensure channel exists */
+  _ensure(peerId) {
+    if (!this._store.has(peerId)) this._store.set(peerId, []);
+  }
+
+  /** Add a message */
+  add(peerId, msg) {
+    this._ensure(peerId);
+    const full = {
+      id:       msg.id   || Utils.uuid(),
+      peerId,
+      type:     msg.type || 'TEXT',
+      text:     msg.text || null,
+      file:     msg.file || null,
+      sender:   msg.sender,    // 'me' | peerId
+      ts:       msg.ts   || Date.now(),
+      burnAfter: msg.burnAfter || null,  // seconds, or null
+      status:   msg.status || 'sent',
+    };
+    this._store.get(peerId).push(full);
+    return full;
+  }
+
+  /** Get messages for a peer */
+  get(peerId) {
+    return this._store.get(peerId) || [];
+  }
+
+  /** Remove a message by ID */
+  remove(peerId, msgId) {
+    if (!this._store.has(peerId)) return;
+    const arr = this._store.get(peerId);
+    const idx = arr.findIndex(m => m.id === msgId);
+    if (idx !== -1) arr.splice(idx, 1);
+  }
+
+  /** Clear all messages for a peer */
+  clearPeer(peerId) {
+    this._store.set(peerId, []);
+  }
+
+  /** Update status */
+  updateStatus(peerId, msgId, status) {
+    const msg = (this._store.get(peerId) || []).find(m => m.id === msgId);
+    if (msg) msg.status = status;
+  }
+}
+
+/* ================================================================
+   MODULE: NetworkCore  —  PeerJS connection management
+   ================================================================ */
+class NetworkCore {
+  constructor(crypto) {
+    this._peer        = null;     // PeerJS Peer
+    this._conn        = null;     // Active DataConnection
+    this._myId        = null;
+    this._remotePeerId = null;
+    this._crypto      = crypto;
+    this._heartbeat   = null;
+    this._mediaCall   = null;    // Active media call
+    this._connected   = false;
+
+    /** File receive buffer: Map<fileId, { meta, chunks, received }> */
+    this._fileBuffers = new Map();
+  }
+
+  /* ------ Initialization ------ */
+
+  async init(peerId) {
+    return new Promise((resolve, reject) => {
+      const opts = { ...Config.PEER_CONFIG };
+      this._peer = peerId ? new Peer(peerId, opts) : new Peer(opts);
+
+      this._peer.on('open', id => {
+        this._myId = id;
+        Bus.emit('net:online', { peerId: id });
+        this._bindPeerEvents();
+        resolve(id);
+      });
+
+      this._peer.on('error', err => {
+        console.error('[Net] Peer error:', err);
+        Bus.emit('net:error', { err });
+        reject(err);
+      });
+    });
+  }
+
+  _bindPeerEvents() {
+    /* Incoming connection */
+    this._peer.on('connection', conn => {
+      console.log('[Net] Incoming connection from:', conn.peer);
+      this._setupConnection(conn);
+      Bus.emit('net:incoming', { peerId: conn.peer });
+    });
+
+    /* Incoming media call */
+    this._peer.on('call', mediaCall => {
+      console.log('[Net] Incoming call from:', mediaCall.peer);
+      this._mediaCall = mediaCall;
+      Bus.emit('net:incomingCall', { peerId: mediaCall.peer });
+    });
+
+    this._peer.on('disconnected', () => {
+      Bus.emit('net:disconnected', {});
+      this._startReconnect();
+    });
+
+    this._peer.on('close', () => {
+      Bus.emit('net:closed', {});
+    });
+  }
+
+  /* ------ Outbound Connection ------ */
+
+  async connect(remotePeerId) {
+    if (this._conn && this._conn.open) {
+      this._conn.close();
+    }
+    return new Promise((resolve, reject) => {
+      const conn = this._peer.connect(remotePeerId, {
+        reliable:     true,
+        serialization:'json',
+        metadata:     { from: this._myId, version: Config.VERSION }
+      });
+      conn.on('open', async () => {
+        await this._setupConnection(conn);
+        resolve(conn);
+      });
+      conn.on('error', err => reject(err));
+    });
+  }
+
+  async _setupConnection(conn) {
+    this._conn          = conn;
+    this._remotePeerId  = conn.peer;
+    this._connected     = true;
+
+    conn.on('data',  data  => this._onData(data));
+    conn.on('close', ()    => this._onConnClose());
+    conn.on('error', err   => console.error('[Net] Conn error:', err));
+
+    this._startHeartbeat();
+
+    // Initiate ECDH handshake
+    await this._sendHandshake();
+  }
+
+  async _sendHandshake() {
+    const pubKey = await this._crypto.exportPublicKey();
+    this._sendRaw({
+      type: Config.MSG_TYPES.HANDSHAKE,
+      pubKey,
+      from: this._myId,
+    });
+  }
+
+  /* ------ Data Receiving ------ */
+
+  async _onData(raw) {
+    try {
+      switch (raw.type) {
+        case Config.MSG_TYPES.HANDSHAKE:
+          await this._handleHandshake(raw);
+          break;
+        case Config.MSG_TYPES.HANDSHAKE_ACK:
+          await this._handleHandshakeAck(raw);
+          break;
+        case Config.MSG_TYPES.TEXT:
+          await this._handleText(raw);
+          break;
+        case Config.MSG_TYPES.FILE_META:
+          this._handleFileMeta(raw);
+          break;
+        case Config.MSG_TYPES.FILE_CHUNK:
+          await this._handleFileChunk(raw);
+          break;
+        case Config.MSG_TYPES.FILE_END:
+          this._handleFileEnd(raw);
+          break;
+        case Config.MSG_TYPES.HEARTBEAT:
+          /* silently acknowledge */
+          break;
+        case Config.MSG_TYPES.TYPING:
+          Bus.emit('net:typing', { peerId: raw.from, active: raw.active });
+          break;
+        case Config.MSG_TYPES.BURN:
+          Bus.emit('net:burn', { msgId: raw.msgId });
+          break;
+        case Config.MSG_TYPES.CALL_OFFER:
+        case Config.MSG_TYPES.CALL_ANSWER:
+        case Config.MSG_TYPES.CALL_REJECT:
+        case Config.MSG_TYPES.CALL_HANGUP:
+          Bus.emit('net:callSignal', raw);
+          break;
+        default:
+          console.warn('[Net] Unknown message type:', raw.type);
+      }
+    } catch (err) {
+      console.error('[Net] Error handling data:', err, raw);
+    }
+  }
+
+  async _handleHandshake(raw) {
+    await this._crypto.importPeerPublicKey(raw.pubKey);
+    // Send ACK with our public key
+    const pubKey = await this._crypto.exportPublicKey();
+    this._sendRaw({ type: Config.MSG_TYPES.HANDSHAKE_ACK, pubKey, from: this._myId });
+    Bus.emit('net:connected', { peerId: raw.from });
+  }
+
+  async _handleHandshakeAck(raw) {
+    await this._crypto.importPeerPublicKey(raw.pubKey);
+    Bus.emit('net:connected', { peerId: raw.from });
+  }
+
+  async _handleText(raw) {
+    try {
+      const text = await this._crypto.decrypt({ iv: raw.iv, ct: raw.ct });
+      Bus.emit('net:message', {
+        id:        raw.id,
+        text,
+        from:      raw.from,
+        ts:        raw.ts,
+        burnAfter: raw.burnAfter || null,
+      });
+    } catch (e) {
+      console.error('[Net] Decryption failed:', e);
+      Bus.emit('net:decryptError', { id: raw.id });
+    }
+  }
+
+  _handleFileMeta(raw) {
+    this._fileBuffers.set(raw.fileId, {
+      meta:     raw.meta,      // { name, size, type, totalChunks }
+      chunks:   [],
+      received: 0,
+    });
+    Bus.emit('net:fileStart', { fileId: raw.fileId, meta: raw.meta, from: raw.from });
+  }
+
+  async _handleFileChunk(raw) {
+    const buf = this._fileBuffers.get(raw.fileId);
+    if (!buf) return;
+    try {
+      const decrypted = await this._crypto.decryptBuffer({ iv: raw.iv, ct: raw.ct });
+      buf.chunks.push(decrypted);
+      buf.received++;
+      Bus.emit('net:fileProgress', {
+        fileId:   raw.fileId,
+        received: buf.received,
+        total:    buf.meta.totalChunks,
+      });
+    } catch (e) {
+      console.error('[Net] File chunk decryption failed:', e);
+    }
+  }
+
+  _handleFileEnd(raw) {
+    const buf = this._fileBuffers.get(raw.fileId);
+    if (!buf) return;
+    const blob = new Blob(buf.chunks, { type: buf.meta.type || 'application/octet-stream' });
+    this._fileBuffers.delete(raw.fileId);
+    Bus.emit('net:fileComplete', {
+      fileId: raw.fileId,
+      meta:   buf.meta,
+      blob,
+      from:   raw.from,
+    });
+  }
+
+  /* ------ Sending ------ */
+
+  _sendRaw(obj) {
+    if (!this._conn || !this._conn.open) {
+      console.warn('[Net] Cannot send — no open connection');
+      return false;
+    }
+    this._conn.send(obj);
+    return true;
+  }
+
+  async sendText(text, { burnAfter = null } = {}) {
+    if (!this._crypto.isReady) throw new Error('Encryption not ready');
+    const id  = Utils.uuid();
+    const ts  = Date.now();
+    const enc = await this._crypto.encrypt(text);
+    this._sendRaw({
+      type:      Config.MSG_TYPES.TEXT,
+      id,
+      from:      this._myId,
+      ts,
+      burnAfter,
+      ...enc,
+    });
+    return { id, ts };
+  }
+
+  async sendFile(file) {
+    if (file.size > Config.MAX_FILE_BYTES) throw new Error(`File too large (max ${Utils.formatBytes(Config.MAX_FILE_BYTES)})`);
+    const fileId      = Utils.uuid();
+    const totalChunks = Math.ceil(file.size / Config.CHUNK_SIZE);
+    const meta        = { name: file.name, size: file.size, type: file.type, totalChunks };
+
+    // Send metadata
+    this._sendRaw({ type: Config.MSG_TYPES.FILE_META, fileId, meta, from: this._myId });
+
+    // Read and send chunks
+    const buffer = await file.arrayBuffer();
+    for (let i = 0; i < totalChunks; i++) {
+      const start  = i * Config.CHUNK_SIZE;
+      const end    = Math.min(start + Config.CHUNK_SIZE, file.size);
+      const chunk  = buffer.slice(start, end);
+      const enc    = await this._crypto.encryptBuffer(chunk);
+      this._sendRaw({ type: Config.MSG_TYPES.FILE_CHUNK, fileId, index: i, from: this._myId, ...enc });
+
+      // Progress
+      Bus.emit('net:fileSendProgress', { fileId, sent: i + 1, total: totalChunks });
+
+      // Yield to avoid blocking
+      if (i % 4 === 3) await new Promise(r => setTimeout(r, 0));
+    }
+
+    this._sendRaw({ type: Config.MSG_TYPES.FILE_END, fileId, from: this._myId });
+    return { fileId, meta };
+  }
+
+  sendTyping(active) {
+    this._sendRaw({ type: Config.MSG_TYPES.TYPING, from: this._myId, active });
+  }
+
+  sendBurn(msgId) {
+    this._sendRaw({ type: Config.MSG_TYPES.BURN, msgId });
+  }
+
+  sendCallSignal(type, payload = {}) {
+    this._sendRaw({ type, from: this._myId, ...payload });
+  }
+
+  /* ------ Media Calls (Stubs + PeerJS MediaStream) ------ */
+
+  async startCall(video = false) {
+    try {
+      const constraints = { audio: true, video };
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      this._mediaCall = this._peer.call(this._remotePeerId, stream);
+      this._bindCallEvents(this._mediaCall, stream);
+      Bus.emit('net:callStarted', { outgoing: true, stream });
+    } catch (err) {
+      Bus.emit('net:callError', { err });
+      throw err;
+    }
+  }
+
+  async answerCall(video = false) {
+    if (!this._mediaCall) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video });
+      this._mediaCall.answer(stream);
+      this._bindCallEvents(this._mediaCall, stream);
+      Bus.emit('net:callAnswered', { stream });
+    } catch (err) {
+      Bus.emit('net:callError', { err });
+    }
+  }
+
+  rejectCall() {
+    this.sendCallSignal(Config.MSG_TYPES.CALL_REJECT);
+    if (this._mediaCall) { this._mediaCall.close(); this._mediaCall = null; }
+  }
+
+  hangUp() {
+    this.sendCallSignal(Config.MSG_TYPES.CALL_HANGUP);
+    if (this._mediaCall) { this._mediaCall.close(); this._mediaCall = null; }
+    Bus.emit('net:callEnded', {});
+  }
+
+  _bindCallEvents(call, localStream) {
+    call.on('stream', remoteStream => {
+      Bus.emit('net:remoteStream', { stream: remoteStream });
+    });
+    call.on('close', () => {
+      localStream.getTracks().forEach(t => t.stop());
+      Bus.emit('net:callEnded', {});
+    });
+    call.on('error', err => Bus.emit('net:callError', { err }));
+  }
+
+  /* ------ Heartbeat ------ */
+
+  _startHeartbeat() {
+    this._stopHeartbeat();
+    this._heartbeat = setInterval(() => {
+      if (this._conn?.open) {
+        this._sendRaw({ type: Config.MSG_TYPES.HEARTBEAT, ts: Date.now() });
+      }
+    }, Config.HEARTBEAT_MS);
+  }
+
+  _stopHeartbeat() {
+    if (this._heartbeat) { clearInterval(this._heartbeat); this._heartbeat = null; }
+  }
+
+  /* ------ Reconnect ------ */
+
+  _startReconnect() {
+    console.log('[Net] Attempting reconnect…');
+    setTimeout(() => {
+      if (this._peer && !this._peer.destroyed) {
+        try { this._peer.reconnect(); } catch (e) { console.error('[Net] Reconnect failed:', e); }
+      }
+    }, 3000);
+  }
+
+  /* ------ Disconnect ------ */
+
+  disconnect() {
+    this._stopHeartbeat();
+    if (this._conn) { this._conn.close(); this._conn = null; }
+    this._connected    = false;
+    this._remotePeerId = null;
+    this._crypto.reset();
+    Bus.emit('net:disconnected', {});
+  }
+
+  destroyPeer() {
+    this.disconnect();
+    if (this._peer) { this._peer.destroy(); this._peer = null; }
+  }
+
+  get myId()        { return this._myId; }
+  get remotePeerId(){ return this._remotePeerId; }
+  get isConnected() { return this._connected && this._conn?.open; }
+}
+
+/* ================================================================
+   MODULE: CanvasBackground  —  3D Parallax Grid with Particles
+   ================================================================ */
+class CanvasBackground {
+  constructor(canvas) {
+    this._canvas = canvas;
+    this._ctx    = canvas.getContext('2d');
+    this._mouse  = { x: 0, y: 0 };
+    this._target = { x: 0, y: 0 };
+    this._time   = 0;
+    this._particles = [];
+    this._animId  = null;
+
+    this._resize();
+    this._initParticles();
+    this._bindEvents();
+    this._start();
+  }
+
+  _resize() {
+    this._canvas.width  = window.innerWidth;
+    this._canvas.height = window.innerHeight;
+    this._W = this._canvas.width;
+    this._H = this._canvas.height;
+  }
+
+  _initParticles() {
+    this._particles = [];
+    const count = Math.floor((this._W * this._H) / 18000);
+    for (let i = 0; i < count; i++) {
+      this._particles.push({
+        x:    Math.random() * this._W,
+        y:    Math.random() * this._H,
+        r:    Math.random() * 1.5 + 0.3,
+        vx:   (Math.random() - 0.5) * 0.15,
+        vy:   (Math.random() - 0.5) * 0.15,
+        a:    Math.random(),
+        aDir: Math.random() > 0.5 ? 1 : -1,
+        aSpd: Math.random() * 0.005 + 0.001,
+        hue:  Math.random() > 0.7 ? 250 : 210,    // mostly purple/blue
+      });
+    }
+  }
+
+  _bindEvents() {
+    window.addEventListener('mousemove', e => {
+      this._target.x = (e.clientX / this._W - 0.5) * 2;
+      this._target.y = (e.clientY / this._H - 0.5) * 2;
+    });
+    window.addEventListener('resize', () => {
+      this._resize();
+      this._initParticles();
+    });
+  }
+
+  _start() {
+    const loop = (ts) => {
+      this._animId = requestAnimationFrame(loop);
+      this._time   = ts * 0.001;
+      this._tick();
+    };
+    this._animId = requestAnimationFrame(loop);
+  }
+
+  _tick() {
+    // Lerp mouse
+    this._mouse.x += (this._target.x - this._mouse.x) * 0.04;
+    this._mouse.y += (this._target.y - this._mouse.y) * 0.04;
+
+    const ctx = this._ctx;
+    const W   = this._W;
+    const H   = this._H;
+
+    ctx.clearRect(0, 0, W, H);
+
+    // Deep background gradient
+    const grad = ctx.createRadialGradient(W * 0.5, H * 0.5, 0, W * 0.5, H * 0.5, W * 0.7);
+    grad.addColorStop(0, 'rgba(18,16,30,1)');
+    grad.addColorStop(1, 'rgba(8,8,12,1)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+
+    // Draw 3D parallax grid
+    this._drawGrid(ctx, W, H);
+
+    // Draw particles
+    this._drawParticles(ctx, W, H);
+
+    // Subtle vignette
+    const vig = ctx.createRadialGradient(W/2, H/2, H*0.3, W/2, H/2, H*0.8);
+    vig.addColorStop(0, 'transparent');
+    vig.addColorStop(1, 'rgba(4,4,8,0.6)');
+    ctx.fillStyle = vig;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  _drawGrid(ctx, W, H) {
+    const mx   = this._mouse.x;
+    const my   = this._mouse.y;
+    const t    = this._time;
+
+    // Vanishing point shifts with mouse
+    const vpX  = W * 0.5 + mx * 60;
+    const vpY  = H * 0.42 + my * 40;
+
+    const COLS = 18;
+    const horizon = vpY;
+    const groundY  = H * 1.05;
+
+    ctx.save();
+    ctx.globalAlpha = 0.18;
+
+    // Vertical grid lines (perspective)
+    for (let i = 0; i <= COLS; i++) {
+      const t0 = i / COLS;
+      const x0 = vpX + (t0 - 0.5) * W * 2.5;
+      const x1 = vpX + (t0 - 0.5) * W * 0.1;
+
+      const grd = ctx.createLinearGradient(x1, horizon, x0, groundY);
+      grd.addColorStop(0, 'rgba(124,110,247,0)');
+      grd.addColorStop(0.4, 'rgba(124,110,247,0.7)');
+      grd.addColorStop(1, 'rgba(95,200,245,0.15)');
+
+      ctx.strokeStyle = grd;
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      ctx.moveTo(x1, horizon);
+      ctx.lineTo(x0, groundY);
+      ctx.stroke();
+    }
+
+    // Horizontal grid lines (animated scrolling)
+    const ROWS = 12;
+    for (let i = 0; i <= ROWS; i++) {
+      const scroll = ((t * 0.08) % 1);
+      const tt = i / ROWS + scroll;
+      const clamped = tt % 1;
+      // Perspective: y is mapped from horizon to ground
+      const y = horizon + Math.pow(clamped, 2.2) * (groundY - horizon);
+
+      const x0 = vpX + (-0.5) * W * (0.1 + clamped * 2.4);
+      const x1 = vpX + ( 0.5) * W * (0.1 + clamped * 2.4);
+
+      const alpha = Math.pow(clamped, 1.5) * 0.85;
+
+      const grdH = ctx.createLinearGradient(x0, y, x1, y);
+      grdH.addColorStop(0,   'rgba(95,200,245,0)');
+      grdH.addColorStop(0.2, `rgba(124,110,247,${alpha})`);
+      grdH.addColorStop(0.8, `rgba(124,110,247,${alpha})`);
+      grdH.addColorStop(1,   'rgba(95,200,245,0)');
+
+      ctx.strokeStyle = grdH;
+      ctx.lineWidth = 0.6 + clamped;
+      ctx.beginPath();
+      ctx.moveTo(x0, y);
+      ctx.lineTo(x1, y);
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+
+  _drawParticles(ctx, W, H) {
+    for (const p of this._particles) {
+      // Move
+      p.x += p.vx + this._mouse.x * 0.3 * p.r;
+      p.y += p.vy + this._mouse.y * 0.2 * p.r;
+      p.a += p.aSpd * p.aDir;
+      if (p.a > 0.7 || p.a < 0.05) p.aDir *= -1;
+
+      // Wrap
+      if (p.x < -5) p.x = W + 5;
+      if (p.x > W + 5) p.x = -5;
+      if (p.y < -5) p.y = H + 5;
+      if (p.y > H + 5) p.y = -5;
+
+      // Draw
+      ctx.save();
+      ctx.globalAlpha = p.a * 0.7;
+      const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r * 3);
+      grad.addColorStop(0, `hsla(${p.hue},80%,75%,1)`);
+      grad.addColorStop(1, `hsla(${p.hue},80%,75%,0)`);
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r * 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  destroy() {
+    if (this._animId) cancelAnimationFrame(this._animId);
+  }
+}
+
+/* ================================================================
+   MODULE: ToastManager  —  Notification toasts
+   ================================================================ */
+class ToastManager {
+  constructor() {
+    this._container = document.getElementById('toast-container');
+    this._queue     = [];
+  }
+
+  show(message, type = 'info', duration = 4000) {
+    const icons = { info: 'ℹ', success: '✓', warning: '⚠', error: '✕' };
+    const el = document.createElement('div');
+    el.className = `toast ${type}`;
+    el.innerHTML = `
+      <span class="toast-icon">${icons[type] || 'ℹ'}</span>
+      <span class="toast-msg">${Utils.escapeHtml(message)}</span>
+    `;
+    this._container.appendChild(el);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => el.classList.add('visible'));
+    });
+    setTimeout(() => this._remove(el), duration);
+  }
+
+  _remove(el) {
+    el.classList.remove('visible');
+    setTimeout(() => el.remove(), 400);
+  }
+
+  info(msg, dur)    { this.show(msg, 'info',    dur); }
+  success(msg, dur) { this.show(msg, 'success', dur); }
+  warning(msg, dur) { this.show(msg, 'warning', dur); }
+  error(msg, dur)   { this.show(msg, 'error',   dur); }
+}
+
+/* ================================================================
+   MODULE: UIRenderer  —  DOM rendering & interaction
+   ================================================================ */
+class UIRenderer {
+  constructor(store, toast) {
+    this._store   = store;
+    this._toast   = toast;
+
+    /* Element references */
+    this._el = {
+      app:            document.getElementById('app'),
+      sidebar:        document.getElementById('sidebar'),
+      sidebarToggle:  document.getElementById('sidebar-toggle-btn'),
+      contacts:       document.getElementById('contacts-list'),
+      connectBtn:     document.getElementById('connect-btn'),
+      peerInput:      document.getElementById('peer-id-input'),
+      disconnectBtn:  document.getElementById('disconnect-btn'),
+      myPeerBadge:    document.getElementById('my-peer-badge'),
+      myPeerIdText:   document.getElementById('my-peer-id-text'),
+      statusDot:      document.getElementById('status-dot'),
+      statusText:     document.getElementById('status-text'),
+      messagesWrap:   document.getElementById('messages-wrap'),
+      emptyState:     document.getElementById('empty-state'),
+      chatPeerName:   document.getElementById('chat-peer-name'),
+      chatPeerStatus: document.getElementById('chat-peer-status'),
+      msgInput:       document.getElementById('msg-input'),
+      sendBtn:        document.getElementById('send-btn'),
+      inputArea:      document.getElementById('input-area'),
+      burnToggle:     document.getElementById('burn-toggle-btn'),
+      burnPicker:     document.getElementById('burn-timer-picker'),
+      fileBtn:        document.getElementById('file-btn'),
+      fileInput:      document.getElementById('file-input'),
+      dropOverlay:    document.getElementById('drop-overlay'),
+      keyPanel:       document.getElementById('key-panel'),
+      keyFingerprint: document.getElementById('key-fingerprint'),
+      burnAllBtn:     document.getElementById('burn-all-btn'),
+      exportBtn:      document.getElementById('export-btn'),
+      callOverlay:    document.getElementById('call-overlay'),
+      callPeerName:   document.getElementById('call-peer-name'),
+      callStatusText: document.getElementById('call-status-text'),
+      callTimer:      document.getElementById('call-timer'),
+      callHangupBtn:  document.getElementById('call-hangup-btn'),
+      callMuteBtn:    document.getElementById('call-mute-btn'),
+      callVideoToggle:document.getElementById('call-video-toggle-btn'),
+      callAvatarText: document.getElementById('call-avatar-text'),
+      typingRow:      document.getElementById('typing-row'),
+      callAudioBtn:   document.getElementById('call-audio-btn'),
+      callVideoBtn:   document.getElementById('call-video-btn'),
+      welcomeScreen:  document.getElementById('welcome-screen'),
+      welcomeName:    document.getElementById('welcome-name'),
+      welcomePeerId:  document.getElementById('welcome-peer-id'),
+      welcomeBtn:     document.getElementById('welcome-launch-btn'),
+    };
+
+    this._activePeer      = null;
+    this._peers           = new Map();  // peerId → { name, unread, lastMsg }
+    this._burnEnabled     = false;
+    this._sidebarVisible  = true;
+    this._callTimerInt    = null;
+    this._callSeconds     = 0;
+    this._localName       = 'Me';
+    this._dropCounter     = 0;
+    this._fileProgressMap = new Map(); // fileId → DOM element
+
+    this._bindStaticEvents();
+  }
+
+  /* ------ Welcome Screen ------ */
+
+  onWelcomeLaunch(cb) { this._welcomeCb = cb; }
+
+  _handleWelcomeClick() {
+    const name   = this._el.welcomeName.value.trim() || 'Ghost_' + Utils.shortId();
+    const peerId = this._el.welcomePeerId.value.trim() || null;
+    this._localName = name;
+
+    // Animate out
+    gsap.to(this._el.welcomeScreen, {
+      opacity: 0,
+      y: -20,
+      duration: 0.55,
+      ease: 'power2.inOut',
+      onComplete: () => {
+        this._el.welcomeScreen.classList.add('hidden');
+        this._el.welcomeScreen.style.display = 'none';
+      }
+    });
+
+    if (this._welcomeCb) this._welcomeCb({ name, peerId });
+  }
+
+  /* ------ Static Event Bindings ------ */
+
+  _bindStaticEvents() {
+    // Welcome
+    this._el.welcomeBtn.addEventListener('click', () => this._handleWelcomeClick());
+    this._el.welcomeName.addEventListener('keydown', e => {
+      if (e.key === 'Enter') this._el.welcomePeerId.focus();
+    });
+    this._el.welcomePeerId.addEventListener('keydown', e => {
+      if (e.key === 'Enter') this._handleWelcomeClick();
+    });
+
+    // Sidebar toggle
+    this._el.sidebarToggle.addEventListener('click', () => this.toggleSidebar());
+
+    // Copy peer ID
+    this._el.myPeerBadge.addEventListener('click', () => {
+      const id = this._el.myPeerIdText.textContent;
+      navigator.clipboard.writeText(id).then(() => {
+        this._toast.success('Peer ID copied to clipboard');
+      }).catch(() => {
+        this._toast.error('Could not copy');
+      });
+    });
+
+    // Connect button
+    this._el.connectBtn.addEventListener('click', () => {
+      const id = this._el.peerInput.value.trim();
+      if (id) Bus.emit('ui:connectRequest', { peerId: id });
+    });
+    this._el.peerInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') this._el.connectBtn.click();
+    });
+
+    // Disconnect
+    this._el.disconnectBtn.addEventListener('click', () => Bus.emit('ui:disconnect', {}));
+
+    // Send button
+    this._el.sendBtn.addEventListener('click', () => this._sendMessage());
+
+    // Textarea auto-grow + enter to send
+    this._el.msgInput.addEventListener('input', () => {
+      this._el.msgInput.style.height = 'auto';
+      this._el.msgInput.style.height = Math.min(this._el.msgInput.scrollHeight, 140) + 'px';
+      Bus.emit('ui:typing', { active: this._el.msgInput.value.length > 0 });
+    });
+    this._el.msgInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        this._sendMessage();
+      }
+    });
+
+    // Burn toggle
+    this._el.burnToggle.addEventListener('click', () => {
+      this._burnEnabled = !this._burnEnabled;
+      this._el.burnToggle.classList.toggle('active', this._burnEnabled);
+      this._el.burnPicker.classList.toggle('visible', this._burnEnabled);
+      if (this._burnEnabled) this._toast.info('Burn-after-read enabled 🔥');
+    });
+
+    // File button
+    this._el.fileBtn.addEventListener('click', () => this._el.fileInput.click());
+    this._el.fileInput.addEventListener('change', e => {
+      const files = [...e.target.files];
+      if (files.length) Bus.emit('ui:fileSend', { files });
+      e.target.value = '';
+    });
+
+    // Drag & drop
+    document.addEventListener('dragenter', e => {
+      this._dropCounter++;
+      this._el.dropOverlay.classList.add('visible');
+    });
+    document.addEventListener('dragleave', e => {
+      this._dropCounter = Math.max(0, this._dropCounter - 1);
+      if (this._dropCounter === 0) this._el.dropOverlay.classList.remove('visible');
+    });
+    document.addEventListener('dragover', e => e.preventDefault());
+    document.addEventListener('drop', e => {
+      e.preventDefault();
+      this._dropCounter = 0;
+      this._el.dropOverlay.classList.remove('visible');
+      const files = [...e.dataTransfer.files];
+      if (files.length) Bus.emit('ui:fileSend', { files });
+    });
+
+    // Burn all
+    this._el.burnAllBtn.addEventListener('click', () => {
+      if (this._activePeer) Bus.emit('ui:burnAll', { peerId: this._activePeer });
+    });
+
+    // Export
+    this._el.exportBtn.addEventListener('click', () => this._exportChat());
+
+    // Call buttons
+    this._el.callAudioBtn.addEventListener('click', () => Bus.emit('ui:startCall', { video: false }));
+    this._el.callVideoBtn.addEventListener('click', () => Bus.emit('ui:startCall', { video: true }));
+    this._el.callHangupBtn.addEventListener('click', () => Bus.emit('ui:hangUp', {}));
+    this._el.callMuteBtn.addEventListener('click', () => Bus.emit('ui:toggleMute', {}));
+    this._el.callVideoToggle.addEventListener('click', () => Bus.emit('ui:toggleVideo', {}));
+  }
+
+  /* ------ Public UI Methods ------ */
+
+  setMyPeerId(id) {
+    this._el.myPeerIdText.textContent = id;
+  }
+
+  setOnlineStatus(online) {
+    this._el.statusDot.classList.toggle('online', online);
+    this._el.statusText.textContent = online ? 'Online' : 'Offline';
+  }
+
+  setConnected(peerId) {
+    this._activePeer = peerId;
+    if (!this._peers.has(peerId)) {
+      this._peers.set(peerId, { name: peerId.slice(0, 12) + '…', unread: 0, lastMsg: '' });
+    }
+    this._renderContactList();
+    this._updateChatHeader(peerId, true);
+  }
+
+  setDisconnected() {
+    if (this._activePeer) {
+      const info = this._peers.get(this._activePeer);
+      if (info) {
+        // Update contact item to show offline
+        this._renderContactList();
+      }
+    }
+    this._updateChatHeader(this._activePeer, false);
+    this._el.keyPanel.classList.remove('visible');
+  }
+
+  showKeyFingerprint(fp) {
+    this._el.keyFingerprint.textContent = fp;
+    this._el.keyPanel.classList.add('visible');
+  }
+
+  _updateChatHeader(peerId, connected) {
+    const name = peerId ? (this._peers.get(peerId)?.name || peerId) : 'Select a peer';
+    this._el.chatPeerName.textContent = name;
+    this._el.chatPeerStatus.innerHTML = connected
+      ? `<span class="enc-badge">🔐 E2E Encrypted</span> &nbsp;Connected`
+      : `<span style="opacity:0.4;">No active connection</span>`;
+  }
+
+  toggleSidebar() {
+    this._sidebarVisible = !this._sidebarVisible;
+    this._el.app.classList.toggle('sidebar-hidden', !this._sidebarVisible);
+    this._el.sidebarToggle.classList.toggle('active', !this._sidebarVisible);
+  }
+
+  showTyping(show) {
+    this._el.typingRow.style.display = show ? 'block' : 'none';
+    if (show) this.scrollToBottom();
+  }
+
+  setActivePeer(peerId) {
+    this._activePeer = peerId;
+    this._renderMessages(peerId);
+    this._renderContactList();
+    this._updateChatHeader(peerId, true);
+  }
+
+  /* ------ Message Rendering ------ */
+
+  appendMessage(peerId, msg) {
+    if (this._activePeer !== peerId) {
+      // Increment unread
+      const p = this._peers.get(peerId);
+      if (p) { p.unread = (p.unread || 0) + 1; p.lastMsg = msg.text || '📎 File'; }
+      this._renderContactList();
+      return;
+    }
+
+    // Clear empty state
+    this._el.emptyState.style.display = 'none';
+
+    const isMe = msg.sender === 'me';
+    const group = this._createMsgGroup(msg, isMe);
+
+    // Animate in
+    group.style.opacity = '0';
+    group.style.transform = `translateY(${isMe ? 8 : -8}px)`;
+    this._el.messagesWrap.appendChild(group);
+
+    gsap.to(group, {
+      opacity: 1,
+      y: 0,
+      duration: 0.35,
+      ease: 'power2.out',
+    });
+
+    this.scrollToBottom();
+
+    // Start burn timer if applicable
+    if (msg.burnAfter) {
+      this._startBurnTimer(msg, group);
+    }
+
+    // Update contact last message
+    const p = this._peers.get(peerId);
+    if (p) { p.lastMsg = msg.text || '📎 File'; p.unread = 0; }
+    this._renderContactList();
+  }
+
+  _createMsgGroup(msg, isMe) {
+    const div = document.createElement('div');
+    div.className = `msg-group ${isMe ? 'outgoing' : 'incoming'}`;
+    div.dataset.msgId = msg.id;
+
+    if (!isMe) {
+      const sender = document.createElement('div');
+      sender.className = 'msg-sender';
+      sender.textContent = this._activePeer?.slice(0, 10) + '…';
+      div.appendChild(sender);
+    }
+
+    const bubble = document.createElement('div');
+    bubble.className = 'msg-bubble';
+
+    if (msg.type === 'TEXT') {
+      bubble.textContent = msg.text;
+    } else if (msg.type === 'FILE') {
+      bubble.classList.add('msg-file');
+      bubble.innerHTML = `
+        <span class="file-icon">${Utils.fileIcon(msg.file.name)}</span>
+        <div class="file-info">
+          <div class="file-name">${Utils.escapeHtml(msg.file.name)}</div>
+          <div class="file-size">${Utils.formatBytes(msg.file.size)}</div>
+          ${msg.file.blob ? `<div class="file-progress"><div class="file-progress-bar" style="width:100%"></div></div>` : ''}
+        </div>
+      `;
+      if (msg.file.blob) {
+        bubble.style.cursor = 'pointer';
+        bubble.addEventListener('click', () => {
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(msg.file.blob);
+          a.download = msg.file.name;
+          a.click();
+          URL.revokeObjectURL(a.href);
+          this._toast.success('Download started');
+        });
+      }
+    }
+
+    div.appendChild(bubble);
+
+    const meta = document.createElement('div');
+    meta.className = 'msg-meta';
+    meta.innerHTML = `<span class="msg-time">${Utils.formatTime(msg.ts)}</span>`;
+    if (isMe) meta.innerHTML += `<span class="msg-status" data-id="${msg.id}">✓</span>`;
+    div.appendChild(meta);
+
+    if (msg.burnAfter) {
+      const badge = document.createElement('div');
+      badge.className = 'burn-badge';
+      badge.innerHTML = `<span class="burn-icon">🔥</span> <span class="burn-count">Burning in ${msg.burnAfter}s</span>`;
+      div.appendChild(badge);
+    }
+
+    return div;
+  }
+
+  _startBurnTimer(msg, groupEl) {
+    let remaining = msg.burnAfter;
+    const badge = groupEl.querySelector('.burn-count');
+    const interval = setInterval(() => {
+      remaining--;
+      if (badge) badge.textContent = `Burning in ${remaining}s`;
+      if (remaining <= 0) {
+        clearInterval(interval);
+        this._burnMessage(msg, groupEl);
+      }
+    }, 1000);
+  }
+
+  _burnMessage(msg, groupEl) {
+    const bubble = groupEl.querySelector('.msg-bubble');
+    if (!bubble) return;
+
+    gsap.to(groupEl, {
+      opacity: 0,
+      scale: 0.9,
+      filter: 'blur(6px)',
+      y: -15,
+      duration: 0.7,
+      ease: 'power2.in',
+      onComplete: () => {
+        groupEl.remove();
+        this._store.remove(this._activePeer, msg.id);
+        Bus.emit('ui:burnSend', { msgId: msg.id });
+      }
+    });
+  }
+
+  burnMessageById(msgId) {
+    const group = this._el.messagesWrap.querySelector(`[data-msg-id="${msgId}"]`);
+    if (!group) return;
+    const msg = { id: msgId };
+    this._burnMessage(msg, group);
+  }
+
+  addFileProgress(fileId, meta, peerId) {
+    const div = document.createElement('div');
+    div.className = `msg-group incoming`;
+    div.dataset.fileProgressId = fileId;
+    div.innerHTML = `
+      <div class="msg-bubble msg-file">
+        <span class="file-icon">${Utils.fileIcon(meta.name)}</span>
+        <div class="file-info">
+          <div class="file-name">${Utils.escapeHtml(meta.name)}</div>
+          <div class="file-size">${Utils.formatBytes(meta.size)} — receiving…</div>
+          <div class="file-progress"><div class="file-progress-bar" style="width:0%"></div></div>
+        </div>
+      </div>
+    `;
+    this._el.emptyState.style.display = 'none';
+    this._el.messagesWrap.appendChild(div);
+    this._fileProgressMap.set(fileId, div);
+    this.scrollToBottom();
+  }
+
+  updateFileProgress(fileId, pct) {
+    const div = this._fileProgressMap.get(fileId);
+    if (!div) return;
+    const bar = div.querySelector('.file-progress-bar');
+    if (bar) bar.style.width = (pct * 100).toFixed(0) + '%';
+  }
+
+  finalizeFileMessage(fileId, meta, blob) {
+    const div = this._fileProgressMap.get(fileId);
+    if (div) div.remove();
+    this._fileProgressMap.delete(fileId);
+  }
+
+  addSystemMessage(text) {
+    const el = document.createElement('div');
+    el.className = 'msg-system';
+    el.textContent = text;
+    this._el.messagesWrap.appendChild(el);
+    this._el.emptyState.style.display = 'none';
+    this.scrollToBottom();
+  }
+
+  clearMessages(peerId) {
+    // Remove all message nodes
+    const wrap = this._el.messagesWrap;
+    [...wrap.children].forEach(child => {
+      if (child.id !== 'empty-state') child.remove();
+    });
+    this._el.emptyState.style.display = 'flex';
+  }
+
+  _renderMessages(peerId) {
+    const wrap = this._el.messagesWrap;
+    [...wrap.children].forEach(child => {
+      if (child.id !== 'empty-state') child.remove();
+    });
+
+    const msgs = this._store.get(peerId);
+    if (!msgs.length) {
+      this._el.emptyState.style.display = 'flex';
+      return;
+    }
+    this._el.emptyState.style.display = 'none';
+
+    let lastDate = null;
+    msgs.forEach(msg => {
+      const d = Utils.formatDate(msg.ts);
+      if (d !== lastDate) {
+        lastDate = d;
+        const sep = document.createElement('div');
+        sep.className = 'msg-date-sep';
+        sep.innerHTML = `<span>${d}</span>`;
+        wrap.appendChild(sep);
+      }
+      const isMe = msg.sender === 'me';
+      wrap.appendChild(this._createMsgGroup(msg, isMe));
+    });
+
+    this.scrollToBottom();
+  }
+
+  _renderContactList() {
+    const list = this._el.contacts;
+    list.innerHTML = '';
+
+    if (this._peers.size === 0) {
+      const el = document.createElement('div');
+      el.style.cssText = 'padding:16px; text-align:center; font-size:11.5px; color:rgba(200,200,240,0.25); line-height:1.7;';
+      el.textContent = 'No peers connected yet.\nEnter a Peer ID above to start.';
+      list.appendChild(el);
+      return;
+    }
+
+    this._peers.forEach((info, peerId) => {
+      const item = document.createElement('div');
+      item.className = `contact-item${peerId === this._activePeer ? ' active' : ''}`;
+      const initial = (info.name || peerId)[0].toUpperCase();
+      item.innerHTML = `
+        <div class="contact-avatar">
+          <div class="contact-avatar-inner">${initial}</div>
+          <div class="contact-presence ${this._activePeer === peerId ? 'online' : 'offline'}"></div>
+        </div>
+        <div class="contact-info">
+          <div class="contact-name">${Utils.escapeHtml(info.name || peerId)}</div>
+          <div class="contact-meta">
+            <div class="contact-last-msg">${Utils.escapeHtml(info.lastMsg || 'No messages yet')}</div>
+          </div>
+        </div>
+        ${info.unread ? `<div class="contact-unread">${info.unread}</div>` : ''}
+      `;
+      item.addEventListener('click', () => {
+        this._peers.get(peerId).unread = 0;
+        this.setActivePeer(peerId);
+      });
+      list.appendChild(item);
+    });
+  }
+
+  _sendMessage() {
+    const text = this._el.msgInput.value.trim();
+    if (!text) return;
+    const burnAfter = this._burnEnabled ? parseInt(this._el.burnPicker.value) : null;
+    Bus.emit('ui:sendText', { text, burnAfter });
+    this._el.msgInput.value = '';
+    this._el.msgInput.style.height = 'auto';
+    Bus.emit('ui:typing', { active: false });
+  }
+
+  _exportChat() {
+    if (!this._activePeer) return;
+    const msgs   = this._store.get(this._activePeer);
+    const lines  = msgs.map(m => {
+      const who  = m.sender === 'me' ? this._localName : m.peerId;
+      const time = new Date(m.ts).toLocaleString();
+      return `[${time}] ${who}: ${m.text || '[File: ' + (m.file?.name || '?') + ']'}`;
+    });
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
+    const a    = document.createElement('a');
+    a.href     = URL.createObjectURL(blob);
+    a.download = `meshcipher-${this._activePeer.slice(0,8)}-${Date.now()}.txt`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    this._toast.success('Chat log exported');
+  }
+
+  scrollToBottom() {
+    const wrap = this._el.messagesWrap;
+    gsap.to(wrap, { scrollTop: wrap.scrollHeight, duration: 0.4, ease: 'power2.out' });
+  }
+
+  addPeer(peerId) {
+    if (!this._peers.has(peerId)) {
+      this._peers.set(peerId, { name: peerId.slice(0, 14) + '…', unread: 0, lastMsg: '' });
+    }
+    this._renderContactList();
+  }
+
+  removePeer(peerId) {
+    this._peers.delete(peerId);
+    if (this._activePeer === peerId) this._activePeer = null;
+    this._renderContactList();
+  }
+
+  /* ------ Call UI ------ */
+
+  showCall(opts) {
+    const { peerName, status, outgoing } = opts;
+    this._el.callPeerName.textContent   = peerName || 'Unknown';
+    this._el.callStatusText.textContent = status   || (outgoing ? 'Calling…' : 'Incoming call…');
+    this._el.callAvatarText.textContent = (peerName || '?')[0].toUpperCase();
+    this._el.callOverlay.classList.add('visible');
+    this._el.callTimer.style.display = 'none';
+    this._callSeconds = 0;
+  }
+
+  startCallTimer() {
+    this._el.callTimer.style.display = 'block';
+    this._el.callStatusText.textContent = 'Connected';
+    this._callTimerInt = setInterval(() => {
+      this._callSeconds++;
+      this._el.callTimer.textContent = Utils.formatDuration(this._callSeconds);
+    }, 1000);
+  }
+
+  hideCall() {
+    this._el.callOverlay.classList.remove('visible');
+    if (this._callTimerInt) { clearInterval(this._callTimerInt); this._callTimerInt = null; }
+  }
+
+  get activePeer()  { return this._activePeer; }
+  get localName()   { return this._localName; }
+  get burnEnabled() { return this._burnEnabled; }
+  get burnDelay()   { return parseInt(this._el.burnPicker.value); }
+}
+
+/* ================================================================
+   MODULE: AppController  —  Orchestrates all modules
+   ================================================================ */
+class AppController {
+  constructor() {
+    this._crypto  = new CryptoEngine();
+    this._store   = new MessageStore();
+    this._toast   = new ToastManager();
+    this._ui      = new UIRenderer(this._store, this._toast);
+    this._net     = new NetworkCore(this._crypto);
+    this._bg      = new CanvasBackground(document.getElementById('bg-canvas'));
+
+    this._typingTimer = null;
+    this._initialized = false;
+  }
+
+  async boot() {
+    console.log(`[App] ${Config.APP_NAME} v${Config.VERSION} booting…`);
+
+    // Init crypto keypair
+    await this._crypto.init();
+
+    // Wire UI callbacks
+    this._ui.onWelcomeLaunch(async ({ name, peerId }) => {
+      await this._initNetwork(name, peerId);
+    });
+
+    // Wire Bus events
+    this._bindBusEvents();
+
+    console.log('[App] Boot complete — awaiting user setup.');
+  }
+
+  async _initNetwork(name, customPeerId) {
+    try {
+      this._toast.info('Initializing P2P node…');
+      const myId = await this._net.init(customPeerId || undefined);
+      this._ui.setMyPeerId(myId);
+      this._ui.setOnlineStatus(true);
+      this._toast.success(`Node online: ${myId.slice(0, 10)}…`);
+      console.log('[App] Peer ID:', myId);
+    } catch (err) {
+      console.error('[App] Network init failed:', err);
+      this._toast.error('Failed to connect to PeerJS network. Check your connection.');
+    }
+  }
+
+  _bindBusEvents() {
+    /* UI Events */
+    Bus.on('ui:connectRequest', async ({ peerId }) => {
+      try {
+        this._toast.info(`Connecting to ${peerId.slice(0, 10)}…`);
+        await this._net.connect(peerId);
+        this._ui.addPeer(peerId);
+        this._ui.setConnected(peerId);
+        this._store._ensure(peerId);
+      } catch (err) {
+        console.error('[App] Connect failed:', err);
+        this._toast.error('Could not connect to peer. Is their ID correct and are they online?');
+      }
+    });
+
+    Bus.on('ui:disconnect', () => {
+      this._net.disconnect();
+      this._ui.setDisconnected();
+      this._toast.info('Disconnected');
+    });
+
+    Bus.on('ui:sendText', async ({ text, burnAfter }) => {
+      if (!this._net.isConnected) {
+        this._toast.warning('Not connected to a peer');
+        return;
+      }
+      try {
+        const { id, ts } = await this._net.sendText(text, { burnAfter });
+        const msg = this._store.add(this._net.remotePeerId, {
+          id, text, sender: 'me', ts, burnAfter, type: 'TEXT',
+        });
+        this._ui.appendMessage(this._net.remotePeerId, msg);
+      } catch (err) {
+        console.error('[App] Send failed:', err);
+        this._toast.error('Failed to send message: ' + err.message);
+      }
+    });
+
+    Bus.on('ui:typing', ({ active }) => {
+      if (!this._net.isConnected) return;
+      clearTimeout(this._typingTimer);
+      this._net.sendTyping(active);
+      if (active) {
+        this._typingTimer = setTimeout(() => {
+          this._net.sendTyping(false);
+        }, Config.TYPING_DEBOUNCE);
+      }
+    });
+
+    Bus.on('ui:fileSend', async ({ files }) => {
+      if (!this._net.isConnected) {
+        this._toast.warning('Connect to a peer first');
+        return;
+      }
+      for (const file of files) {
+        try {
+          this._toast.info(`Sending ${file.name}…`);
+          const { fileId, meta } = await this._net.sendFile(file);
+          const msg = this._store.add(this._net.remotePeerId, {
+            type: 'FILE',
+            sender: 'me',
+            file: { name: file.name, size: file.size, type: file.type },
+          });
+          this._ui.appendMessage(this._net.remotePeerId, msg);
+          this._toast.success(`${file.name} sent!`);
+        } catch (err) {
+          this._toast.error('File send failed: ' + err.message);
+        }
+      }
+    });
+
+    Bus.on('ui:burnAll', ({ peerId }) => {
+      this._store.clearPeer(peerId);
+      this._ui.clearMessages(peerId);
+      this._toast.info('All messages burned 🔥');
+    });
+
+    Bus.on('ui:burnSend', ({ msgId }) => {
+      if (this._net.isConnected) this._net.sendBurn(msgId);
+    });
+
+    Bus.on('ui:startCall', async ({ video }) => {
+      if (!this._net.isConnected) {
+        this._toast.warning('Connect to a peer first');
+        return;
+      }
+      try {
+        this._ui.showCall({ peerName: this._net.remotePeerId.slice(0, 10), outgoing: true });
+        await this._net.startCall(video);
+      } catch (err) {
+        this._ui.hideCall();
+        this._toast.error('Call failed: ' + (err.name === 'NotAllowedError' ? 'Microphone access denied' : err.message));
+      }
+    });
+
+    Bus.on('ui:hangUp', () => {
+      this._net.hangUp();
+      this._ui.hideCall();
+    });
+
+    /* Network Events */
+    Bus.on('net:online', ({ peerId }) => {
+      this._ui.setMyPeerId(peerId);
+      this._ui.setOnlineStatus(true);
+    });
+
+    Bus.on('net:connected', ({ peerId }) => {
+      this._ui.addPeer(peerId);
+      this._ui.setConnected(peerId);
+      this._ui.addSystemMessage(`🔗 Secure session established with ${peerId.slice(0, 12)}…`);
+      this._toast.success('Peer connected');
+    });
+
+    Bus.on('net:incoming', ({ peerId }) => {
+      this._ui.addPeer(peerId);
+      this._toast.info(`Incoming connection from ${peerId.slice(0, 10)}…`);
+    });
+
+    Bus.on('net:disconnected', () => {
+      this._ui.setDisconnected();
+      this._ui.addSystemMessage('⚡ Connection lost');
+      this._toast.warning('Disconnected from peer');
+    });
+
+    Bus.on('net:error', ({ err }) => {
+      this._toast.error('Network error: ' + (err.type || err.message || 'Unknown error'));
+    });
+
+    Bus.on('net:message', ({ id, text, from, ts, burnAfter }) => {
+      const peerId = this._net.remotePeerId || from;
+      const msg    = this._store.add(peerId, {
+        id, text, sender: from, ts, burnAfter, type: 'TEXT',
+      });
+      this._ui.appendMessage(peerId, msg);
+      this._ui.showTyping(false);
+    });
+
+    Bus.on('net:typing', ({ peerId, active }) => {
+      this._ui.showTyping(active);
+    });
+
+    Bus.on('net:burn', ({ msgId }) => {
+      this._ui.burnMessageById(msgId);
+      if (this._ui.activePeer) this._store.remove(this._ui.activePeer, msgId);
+    });
+
+    Bus.on('net:fileStart', ({ fileId, meta, from }) => {
+      this._ui.addFileProgress(fileId, meta, from);
+    });
+
+    Bus.on('net:fileProgress', ({ fileId, received, total }) => {
+      this._ui.updateFileProgress(fileId, received / total);
+    });
+
+    Bus.on('net:fileComplete', ({ fileId, meta, blob, from }) => {
+      this._ui.finalizeFileMessage(fileId, meta, blob);
+      const peerId = this._net.remotePeerId || from;
+      const msg    = this._store.add(peerId, {
+        type: 'FILE',
+        sender: from,
+        file: { name: meta.name, size: meta.size, type: meta.type, blob },
+      });
+      this._ui.appendMessage(peerId, msg);
+      this._toast.success(`📁 Received ${meta.name}`);
+    });
+
+    Bus.on('net:fileSendProgress', ({ fileId, sent, total }) => {
+      /* Could show outgoing progress bar — extension point */
+    });
+
+    Bus.on('crypto:ready', ({ fingerprint }) => {
+      this._ui.showKeyFingerprint(fingerprint);
+    });
+
+    Bus.on('net:incomingCall', ({ peerId }) => {
+      // For now: auto show call UI with accept prompt
+      this._ui.showCall({ peerName: peerId.slice(0, 10), status: 'Incoming call…', outgoing: false });
+      this._toast.info(`📞 Incoming call from ${peerId.slice(0, 10)}…`, 8000);
+    });
+
+    Bus.on('net:callStarted', () => {
+      /* Remote stream would attach to <video> element */
+    });
+
+    Bus.on('net:callAnswered', () => {
+      this._ui.startCallTimer();
+    });
+
+    Bus.on('net:callEnded', () => {
+      this._ui.hideCall();
+      this._toast.info('Call ended');
+    });
+
+    Bus.on('net:callError', ({ err }) => {
+      this._ui.hideCall();
+      this._toast.error('Call error: ' + (err?.message || 'Unknown'));
+    });
+
+    Bus.on('net:remoteStream', ({ stream }) => {
+      this._ui.startCallTimer();
+      /* Attach stream to hidden <audio>/<video> element */
+      let audio = document.getElementById('remote-audio');
+      if (!audio) {
+        audio = document.createElement('audio');
+        audio.id      = 'remote-audio';
+        audio.autoplay = true;
+        document.body.appendChild(audio);
+      }
+      audio.srcObject = stream;
+    });
+
+    Bus.on('net:decryptError', ({ id }) => {
+      this._toast.error('Failed to decrypt message — possible key mismatch');
+    });
+  }
+}
+
+/* ================================================================
+   ENTRY POINT
+   ================================================================ */
+document.addEventListener('DOMContentLoaded', async () => {
+  try {
+    const app = new AppController();
+    await app.boot();
+    window.__meshApp = app;  // Dev access
+  } catch (err) {
+    console.error('[Boot] Fatal error:', err);
+    document.body.innerHTML = `<div style="color:#f25f5c;font-family:monospace;padding:40px;font-size:14px;">
+      <strong>⚠ Fatal Boot Error</strong><br><br>${err.message}
+    </div>`;
+  }
+});
+</script>
+</body>
+</html>
