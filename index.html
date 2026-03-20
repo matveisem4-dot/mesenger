@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ONYX - P2P Messenger</title>
+    <title>ONYX P2P Messenger</title>
     <script src="https://unpkg.com/peerjs@1.5.1/dist/peerjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -13,360 +14,468 @@
         }
 
         body {
-            font-family: 'Courier New', monospace;
-            background: #0a0a0a;
+            font-family: 'Courier New', 'Consolas', monospace;
+            background: #000000;
             color: #e0e0e0;
             overflow: hidden;
             height: 100vh;
             position: relative;
+            cursor: crosshair;
         }
 
-        #particleCanvas {
+        #digitalRainCanvas {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
             z-index: 1;
-            opacity: 0.6;
+            opacity: 0.8;
         }
 
-        .container {
+        .main-container {
             position: relative;
             z-index: 2;
             height: 100vh;
-            display: flex;
-            flex-direction: column;
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-
-        .header {
-            text-align: center;
-            padding: 20px 0;
-            background: linear-gradient(135deg, #1a1a2e, #16213e);
-            border: 1px solid #0f3460;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            box-shadow: 0 4px 20px rgba(15, 52, 96, 0.5);
-        }
-
-        .header h1 {
-            font-size: 2.5em;
-            background: linear-gradient(45deg, #00ffff, #ff00ff);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            text-shadow: 0 0 30px rgba(0, 255, 255, 0.5);
-            margin-bottom: 10px;
-        }
-
-        .connection-panel {
-            display: flex;
+            display: grid;
+            grid-template-columns: 350px 1fr 400px;
             gap: 20px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
+            padding: 20px;
+            max-width: 1800px;
+            margin: 0 auto;
         }
 
         .panel {
-            background: linear-gradient(135deg, #1a1a2e, #0f3460);
-            border: 1px solid #00ffff;
-            border-radius: 10px;
-            padding: 20px;
-            flex: 1;
-            min-width: 300px;
-            box-shadow: 0 4px 20px rgba(0, 255, 255, 0.2);
+            background: linear-gradient(145deg, rgba(10, 10, 20, 0.95), rgba(5, 5, 15, 0.95));
+            border: 1px solid rgba(0, 242, 255, 0.3);
+            border-radius: 15px;
+            padding: 25px;
+            backdrop-filter: blur(10px);
+            box-shadow: 
+                0 0 30px rgba(0, 242, 255, 0.1),
+                inset 0 0 20px rgba(0, 242, 255, 0.05);
+            position: relative;
+            overflow: hidden;
         }
 
-        .panel h3 {
-            color: #00ffff;
-            margin-bottom: 15px;
+        .panel::before {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            bottom: -2px;
+            background: linear-gradient(45deg, #00f2ff, #ff007a, #00f2ff);
+            border-radius: 15px;
+            opacity: 0;
+            z-index: -1;
+            transition: opacity 0.3s ease;
+        }
+
+        .panel:hover::before {
+            opacity: 0.3;
+        }
+
+        .panel-header {
+            font-size: 1.2em;
+            color: #00f2ff;
+            margin-bottom: 20px;
             text-transform: uppercase;
-            letter-spacing: 2px;
+            letter-spacing: 3px;
+            font-weight: bold;
+            text-shadow: 0 0 10px rgba(0, 242, 255, 0.8);
+            border-bottom: 1px solid rgba(0, 242, 255, 0.3);
+            padding-bottom: 10px;
+        }
+
+        /* Control Panel */
+        .control-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 10px;
+            border: 1px solid rgba(0, 242, 255, 0.2);
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ff0000;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.online {
+            background: #00ff00;
+            box-shadow: 0 0 10px #00ff00;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .status-text {
+            color: #e0e0e0;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
 
         input, button, textarea {
             width: 100%;
-            padding: 12px;
-            margin: 8px 0;
-            background: rgba(0, 0, 0, 0.5);
-            border: 1px solid #00ffff;
-            border-radius: 5px;
+            padding: 15px;
+            margin: 10px 0;
+            background: rgba(0, 0, 0, 0.7);
+            border: 1px solid rgba(0, 242, 255, 0.3);
+            border-radius: 8px;
             color: #e0e0e0;
             font-family: 'Courier New', monospace;
+            font-size: 0.9em;
             transition: all 0.3s ease;
         }
 
         input:focus, textarea:focus {
             outline: none;
-            border-color: #ff00ff;
-            box-shadow: 0 0 10px rgba(255, 0, 255, 0.5);
+            border-color: #ff007a;
+            box-shadow: 0 0 15px rgba(255, 0, 122, 0.5);
+            background: rgba(0, 0, 0, 0.8);
         }
 
         button {
-            background: linear-gradient(45deg, #0f3460, #16213e);
-            color: #00ffff;
+            background: linear-gradient(45deg, rgba(0, 242, 255, 0.1), rgba(255, 0, 122, 0.1));
+            color: #00f2ff;
             cursor: pointer;
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 2px;
             font-weight: bold;
+            border: 1px solid rgba(0, 242, 255, 0.5);
             transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        button::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            background: radial-gradient(circle, rgba(0, 242, 255, 0.3), transparent);
+            transition: width 0.3s, height 0.3s;
+            transform: translate(-50%, -50%);
+        }
+
+        button:hover::before {
+            width: 100%;
+            height: 100%;
         }
 
         button:hover {
-            background: linear-gradient(45deg, #16213e, #0f3460);
-            box-shadow: 0 0 15px rgba(0, 255, 255, 0.5);
+            border-color: #ff007a;
+            color: #ff007a;
+            box-shadow: 0 0 20px rgba(255, 0, 122, 0.5);
             transform: translateY(-2px);
         }
 
         button:disabled {
             opacity: 0.5;
             cursor: not-allowed;
+            border-color: #666;
         }
 
-        .chat-container {
-            display: flex;
-            gap: 20px;
-            flex: 1;
-            min-height: 0;
-        }
-
-        .messages-panel {
-            flex: 2;
+        /* Chat Panel */
+        .chat-panel {
             display: flex;
             flex-direction: column;
+            height: calc(100vh - 40px);
         }
 
-        .messages {
+        .messages-container {
             flex: 1;
-            background: rgba(0, 0, 0, 0.7);
-            border: 1px solid #0f3460;
+            background: rgba(0, 0, 0, 0.8);
             border-radius: 10px;
             padding: 20px;
             overflow-y: auto;
             margin-bottom: 20px;
+            border: 1px solid rgba(0, 242, 255, 0.2);
+        }
+
+        .messages-container::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .messages-container::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 4px;
+        }
+
+        .messages-container::-webkit-scrollbar-thumb {
+            background: linear-gradient(45deg, #00f2ff, #ff007a);
+            border-radius: 4px;
         }
 
         .message {
-            margin: 10px 0;
-            padding: 12px;
-            border-radius: 8px;
-            border-left: 3px solid #00ffff;
-            background: rgba(15, 52, 96, 0.3);
-            animation: slideIn 0.3s ease;
+            margin: 15px 0;
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 3px solid #00f2ff;
+            background: rgba(0, 242, 255, 0.05);
+            opacity: 0;
+            transform: translateX(-20px);
         }
 
         .message.own {
-            border-left-color: #ff00ff;
-            background: rgba(255, 0, 255, 0.1);
+            border-left-color: #ff007a;
+            background: rgba(255, 0, 122, 0.05);
             text-align: right;
+            transform: translateX(20px);
         }
 
         .message-header {
-            font-size: 0.9em;
-            color: #00ffff;
-            margin-bottom: 5px;
+            font-size: 0.8em;
+            color: #00f2ff;
+            margin-bottom: 8px;
             font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
 
         .message-content {
+            line-height: 1.5;
             word-wrap: break-word;
-            line-height: 1.4;
+        }
+
+        .message-input-container {
+            display: flex;
+            gap: 15px;
         }
 
         .message-input {
-            display: flex;
-            gap: 10px;
-        }
-
-        .message-input textarea {
             flex: 1;
             resize: none;
-            min-height: 50px;
+            min-height: 60px;
         }
 
-        .peers-panel {
+        /* Network Log Panel */
+        .network-log {
+            display: flex;
+            flex-direction: column;
+            height: calc(100vh - 40px);
+        }
+
+        .log-container {
             flex: 1;
-            max-width: 300px;
-        }
-
-        .peer-list {
-            background: rgba(0, 0, 0, 0.7);
-            border: 1px solid #0f3460;
+            background: rgba(0, 0, 0, 0.9);
             border-radius: 10px;
             padding: 15px;
-            max-height: 300px;
             overflow-y: auto;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 0.8em;
+            border: 1px solid rgba(0, 242, 255, 0.2);
         }
 
-        .peer-item {
-            padding: 10px;
+        .log-entry {
             margin: 5px 0;
-            background: rgba(15, 52, 96, 0.3);
+            padding: 8px;
             border-radius: 5px;
-            border: 1px solid #00ffff;
-            cursor: pointer;
-            transition: all 0.3s ease;
+            border-left: 2px solid #00f2ff;
+            background: rgba(0, 242, 255, 0.02);
+            opacity: 0;
+            transform: translateX(-10px);
         }
 
-        .peer-item:hover {
-            background: rgba(0, 255, 255, 0.1);
-            transform: translateX(5px);
+        .log-entry.error {
+            border-left-color: #ff0000;
+            background: rgba(255, 0, 0, 0.05);
+            color: #ff6666;
         }
 
-        .peer-item.connected {
-            border-color: #00ff00;
-            background: rgba(0, 255, 0, 0.1);
+        .log-entry.success {
+            border-left-color: #00ff00;
+            background: rgba(0, 255, 0, 0.05);
+            color: #66ff66;
         }
 
-        .status {
-            padding: 10px;
+        .log-entry.warning {
+            border-left-color: #ffff00;
+            background: rgba(255, 255, 0, 0.05);
+            color: #ffff66;
+        }
+
+        .log-timestamp {
+            color: #888;
+            margin-right: 10px;
+        }
+
+        .log-level {
+            font-weight: bold;
+            margin-right: 10px;
+            text-transform: uppercase;
+        }
+
+        .peer-id-display {
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid rgba(0, 242, 255, 0.3);
+            border-radius: 8px;
+            padding: 15px;
             margin: 10px 0;
-            border-radius: 5px;
-            text-align: center;
+            font-family: 'Consolas', monospace;
+            font-size: 0.9em;
+            word-break: break-all;
+            color: #00f2ff;
+        }
+
+        .connection-info {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 10px;
+            border: 1px solid rgba(0, 242, 255, 0.2);
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 8px 0;
+            font-size: 0.8em;
+        }
+
+        .info-label {
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .info-value {
+            color: #00f2ff;
             font-weight: bold;
         }
 
-        .status.connected {
-            background: rgba(0, 255, 0, 0.2);
-            border: 1px solid #00ff00;
-            color: #00ff00;
-        }
-
-        .status.connecting {
-            background: rgba(255, 255, 0, 0.2);
-            border: 1px solid #ffff00;
-            color: #ffff00;
-        }
-
-        .status.disconnected {
-            background: rgba(255, 0, 0, 0.2);
+        .error-warning {
+            background: rgba(255, 0, 0, 0.1);
             border: 1px solid #ff0000;
-            color: #ff0000;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+            color: #ff6666;
+            text-align: center;
+            animation: warningPulse 2s infinite;
         }
 
-        .file-share-panel {
-            margin-top: 20px;
+        @keyframes warningPulse {
+            0%, 100% { opacity: 0.8; }
+            50% { opacity: 1; }
         }
 
-        .file-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px;
-            margin: 5px 0;
-            background: rgba(15, 52, 96, 0.3);
-            border-radius: 5px;
-            border: 1px solid #00ffff;
-        }
-
-        .file-progress {
-            width: 100%;
-            height: 4px;
-            background: rgba(0, 0, 0, 0.5);
-            border-radius: 2px;
-            overflow: hidden;
-            margin-top: 5px;
-        }
-
-        .file-progress-bar {
-            height: 100%;
-            background: linear-gradient(90deg, #00ffff, #ff00ff);
-            transition: width 0.3s ease;
-        }
-
-        @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateX(-20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateX(0);
+        @media (max-width: 1400px) {
+            .main-container {
+                grid-template-columns: 300px 1fr 350px;
             }
         }
 
-        .encryption-info {
-            font-size: 0.8em;
-            color: #00ff00;
-            margin-top: 5px;
-        }
-
-        @media (max-width: 768px) {
-            .chat-container {
-                flex-direction: column;
+        @media (max-width: 1200px) {
+            .main-container {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto 1fr auto;
             }
             
-            .peers-panel {
-                max-width: 100%;
+            .control-panel {
+                order: 1;
             }
             
-            .connection-panel {
-                flex-direction: column;
+            .chat-panel {
+                order: 2;
+            }
+            
+            .network-log {
+                order: 3;
             }
         }
     </style>
 </head>
 <body>
-    <canvas id="particleCanvas"></canvas>
+    <canvas id="digitalRainCanvas"></canvas>
     
-    <div class="container">
-        <div class="header">
-            <h1>ONYX</h1>
-            <p>P2P Encrypted Messenger</p>
+    <div class="main-container">
+        <!-- Control Panel -->
+        <div class="panel control-panel">
+            <div class="panel-header">Control Node</div>
+            
+            <div class="status-indicator">
+                <div class="status-dot" id="statusDot"></div>
+                <div class="status-text" id="statusText">OFFLINE</div>
+            </div>
+
+            <div class="peer-id-display" id="peerIdDisplay">
+                ID: Not Generated
+            </div>
+
+            <button id="startBtn">Initialize ONYX</button>
+            <button id="copyIdBtn" disabled>Copy Peer ID</button>
+
+            <div class="connection-info">
+                <div class="info-row">
+                    <span class="info-label">Host:</span>
+                    <span class="info-value">my-mesh-node.serveo.net</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Port:</span>
+                    <span class="info-value">443 (SSL)</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Protocol:</span>
+                    <span class="info-value">WSS</span>
+                </div>
+            </div>
+
+            <input type="text" id="remotePeerId" placeholder="Enter Remote Peer ID">
+            <button id="connectBtn" disabled>Connect to Peer</button>
+
+            <div id="errorWarning" style="display: none;" class="error-warning">
+                Network Error: Unable to reach relay server
+            </div>
         </div>
 
-        <div class="connection-panel">
-            <div class="panel">
-                <h3>Your Identity</h3>
-                <div id="status" class="status disconnected">Disconnected</div>
-                <input type="text" id="peerId" placeholder="Your ID will appear here" readonly>
-                <button id="startBtn">Start ONYX</button>
-                <button id="copyIdBtn" disabled>Copy Your ID</button>
-            </div>
+        <!-- Chat Panel -->
+        <div class="panel chat-panel">
+            <div class="panel-header">Secure Channel</div>
             
-            <div class="panel">
-                <h3>Connect to Peer</h3>
-                <input type="text" id="remotePeerId" placeholder="Enter peer ID to connect">
-                <button id="connectBtn" disabled>Connect</button>
-                <div class="encryption-info">🔒 AES-GCM Encryption Active</div>
+            <div class="messages-container" id="messagesContainer"></div>
+            
+            <div class="message-input-container">
+                <textarea id="messageInput" placeholder="Type encrypted message..." disabled></textarea>
+                <button id="sendBtn" disabled>Transmit</button>
             </div>
         </div>
 
-        <div class="chat-container">
-            <div class="messages-panel">
-                <div class="messages" id="messages"></div>
-                <div class="message-input">
-                    <textarea id="messageInput" placeholder="Type your encrypted message here..." disabled></textarea>
-                    <button id="sendBtn" disabled>Send</button>
-                </div>
-            </div>
+        <!-- Network Log Panel -->
+        <div class="panel network-log">
+            <div class="panel-header">Network Log</div>
             
-            <div class="peers-panel">
-                <div class="panel">
-                    <h3>Connected Peers</h3>
-                    <div class="peer-list" id="peerList">
-                        <p style="color: #666; text-align: center;">No peers connected</p>
-                    </div>
-                </div>
-                
-                <div class="panel file-share-panel">
-                    <h3>File Sharing</h3>
-                    <input type="file" id="fileInput" multiple disabled>
-                    <button id="sendFileBtn" disabled>Send Files</button>
-                    <div id="fileList"></div>
-                </div>
-            </div>
+            <div class="log-container" id="logContainer"></div>
         </div>
     </div>
 
     <script>
-        // Particle Background
-        class ParticleBackground {
+        // Digital Rain Canvas Background
+        class DigitalRain {
             constructor() {
-                this.canvas = document.getElementById('particleCanvas');
+                this.canvas = document.getElementById('digitalRainCanvas');
                 this.ctx = this.canvas.getContext('2d');
-                this.particles = [];
+                this.mouseX = 0;
+                this.mouseY = 0;
+                this.columns = [];
+                this.fontSize = 14;
                 this.init();
                 this.animate();
             }
@@ -374,17 +483,30 @@
             init() {
                 this.resize();
                 window.addEventListener('resize', () => this.resize());
-                
-                for (let i = 0; i < 100; i++) {
-                    this.particles.push({
-                        x: Math.random() * this.canvas.width,
+                window.addEventListener('mousemove', (e) => {
+                    this.mouseX = e.clientX;
+                    this.mouseY = e.clientY;
+                });
+
+                const columnCount = Math.floor(this.canvas.width / this.fontSize);
+                for (let i = 0; i < columnCount; i++) {
+                    this.columns.push({
+                        x: i * this.fontSize,
                         y: Math.random() * this.canvas.height,
-                        vx: (Math.random() - 0.5) * 0.5,
-                        vy: (Math.random() - 0.5) * 0.5,
-                        size: Math.random() * 2 + 1,
-                        color: Math.random() > 0.5 ? '#00ffff' : '#ff00ff'
+                        speed: Math.random() * 2 + 1,
+                        chars: this.generateRandomChars(20),
+                        opacity: Math.random() * 0.5 + 0.5
                     });
                 }
+            }
+
+            generateRandomChars(count) {
+                const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789@#$%^&*()_+-=[]{}|;:,.<>?';
+                let result = '';
+                for (let i = 0; i < count; i++) {
+                    result += chars[Math.floor(Math.random() * chars.length)];
+                }
+                return result;
             }
 
             resize() {
@@ -393,109 +515,73 @@
             }
 
             animate() {
-                this.ctx.fillStyle = 'rgba(10, 10, 10, 0.1)';
+                this.ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
                 this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-                this.particles.forEach(particle => {
-                    particle.x += particle.vx;
-                    particle.y += particle.vy;
+                this.columns.forEach(column => {
+                    column.y += column.speed;
 
-                    if (particle.x < 0 || particle.x > this.canvas.width) particle.vx *= -1;
-                    if (particle.y < 0 || particle.y > this.canvas.height) particle.vy *= -1;
+                    if (column.y > this.canvas.height) {
+                        column.y = -column.chars.length * this.fontSize;
+                        column.chars = this.generateRandomChars(20);
+                        column.speed = Math.random() * 2 + 1;
+                    }
 
-                    this.ctx.beginPath();
-                    this.ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
-                    this.ctx.fillStyle = particle.color;
-                    this.ctx.fill();
-                });
+                    // Mouse interaction
+                    const distance = Math.sqrt(
+                        Math.pow(column.x - this.mouseX, 2) + 
+                        Math.pow(column.y - this.mouseY, 2)
+                    );
+                    
+                    const influence = Math.max(0, 1 - distance / 200);
+                    const currentOpacity = column.opacity + influence * 0.5;
 
-                // Draw connections
-                this.particles.forEach((p1, i) => {
-                    this.particles.slice(i + 1).forEach(p2 => {
-                        const distance = Math.sqrt((p1.x - p2.x) ** 2 + (p1.y - p2.y) ** 2);
-                        if (distance < 100) {
-                            this.ctx.beginPath();
-                            this.ctx.moveTo(p1.x, p1.y);
-                            this.ctx.lineTo(p2.x, p2.y);
-                            this.ctx.strokeStyle = `rgba(0, 255, 255, ${1 - distance / 100})`;
-                            this.ctx.stroke();
+                    for (let i = 0; i < column.chars.length; i++) {
+                        const charY = column.y - i * this.fontSize;
+                        
+                        if (charY > 0 && charY < this.canvas.height) {
+                            const opacity = (1 - i / column.chars.length) * currentOpacity;
+                            const color = i === 0 ? 
+                                `rgba(255, 0, 122, ${opacity})` : 
+                                `rgba(0, 242, 255, ${opacity})`;
+                            
+                            this.ctx.fillStyle = color;
+                            this.ctx.font = `${this.fontSize}px 'Courier New', monospace`;
+                            this.ctx.fillText(column.chars[i], column.x, charY);
                         }
-                    });
+                    }
                 });
 
                 requestAnimationFrame(() => this.animate());
             }
         }
 
-        // AES-GCM Encryption
-        class AESEncryption {
-            constructor() {
-                this.key = null;
-                this.init();
-            }
-
-            async init() {
-                this.key = await crypto.subtle.generateKey(
-                    { name: 'AES-GCM', length: 256 },
-                    true,
-                    ['encrypt', 'decrypt']
-                );
-            }
-
-            async encrypt(text) {
-                const iv = crypto.getRandomValues(new Uint8Array(12));
-                const encoded = new TextEncoder().encode(text);
-                const encrypted = await crypto.subtle.encrypt(
-                    { name: 'AES-GCM', iv },
-                    this.key,
-                    encoded
-                );
-                
-                return {
-                    encrypted: Array.from(new Uint8Array(encrypted)),
-                    iv: Array.from(iv)
-                };
-            }
-
-            async decrypt(encryptedData) {
-                const { encrypted, iv } = encryptedData;
-                const decrypted = await crypto.subtle.decrypt(
-                    { name: 'AES-GCM', iv: new Uint8Array(iv) },
-                    this.key,
-                    new Uint8Array(encrypted)
-                );
-                
-                return new TextDecoder().decode(decrypted);
-            }
-
-            async exportKey() {
-                return await crypto.subtle.exportKey('jwk', this.key);
-            }
-
-            async importKey(keyData) {
-                this.key = await crypto.subtle.importKey(
-                    'jwk',
-                    keyData,
-                    { name: 'AES-GCM' },
-                    true,
-                    ['encrypt', 'decrypt']
-                );
-            }
-        }
-
-        // ONYX Messenger
+        // ONYX P2P Messenger
         class OnyxMessenger {
             constructor() {
                 this.peer = null;
                 this.connections = new Map();
-                this.encryption = new AESEncryption();
-                this.fileTransfers = new Map();
+                this.isOnline = false;
+                this.peerId = null;
                 this.init();
             }
 
-            async init() {
-                new ParticleBackground();
+            init() {
+                new DigitalRain();
                 this.setupEventListeners();
+                this.generateRandomId();
+                this.log('INFO', 'ONYX Messenger initialized');
+            }
+
+            generateRandomId() {
+                const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+                let id = 'ONYX-';
+                for (let i = 0; i < 12; i++) {
+                    id += chars[Math.floor(Math.random() * chars.length)];
+                }
+                this.peerId = id;
+                document.getElementById('peerIdDisplay').textContent = `ID: ${id}`;
+                this.log('INFO', `Generated peer ID: ${id}`);
             }
 
             setupEventListeners() {
@@ -503,7 +589,6 @@
                 document.getElementById('connectBtn').addEventListener('click', () => this.connect());
                 document.getElementById('sendBtn').addEventListener('click', () => this.sendMessage());
                 document.getElementById('copyIdBtn').addEventListener('click', () => this.copyId());
-                document.getElementById('sendFileBtn').addEventListener('click', () => this.sendFiles());
                 
                 document.getElementById('messageInput').addEventListener('keypress', (e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
@@ -511,32 +596,59 @@
                         this.sendMessage();
                     }
                 });
+
+                // Animate panels on load
+                gsap.from('.panel', {
+                    duration: 1,
+                    y: 50,
+                    opacity: 0,
+                    stagger: 0.2,
+                    ease: 'power3.out'
+                });
             }
 
             async start() {
                 try {
-                    // Fetch with bypass header before starting PeerJS
-                    await fetch('https://my-mesh-node.serveo.net', {
+                    this.log('INFO', 'Warming up tunnel to relay server...');
+                    
+                    // Tunnel warmup with bypass header
+                    const response = await fetch('https://my-mesh-node.serveo.net', {
                         headers: { 'Bypass-Tunnel-Reminder': 'true' }
                     });
-
+                    
+                    if (!response.ok) {
+                        throw new Error('Relay server not responding');
+                    }
+                    
+                    this.log('SUCCESS', 'Tunnel warmed up successfully');
                     this.updateStatus('connecting');
                     
-                    this.peer = new Peer({
+                    this.peer = new Peer(this.peerId, {
                         host: 'my-mesh-node.serveo.net',
                         port: 443,
                         path: '/',
-                        secure: true
+                        secure: true,
+                        config: {
+                            iceServers: [
+                                { urls: 'stun:stun.l.google.com:19302' }
+                            ]
+                        }
                     });
 
                     this.peer.on('open', (id) => {
-                        document.getElementById('peerId').value = id;
-                        document.getElementById('startBtn').textContent = 'ONYX Active';
-                        document.getElementById('startBtn').disabled = true;
-                        document.getElementById('connectBtn').disabled = false;
-                        document.getElementById('copyIdBtn').disabled = false;
-                        this.updateStatus('connected');
-                        this.addMessage('System', 'ONYX messenger started successfully', 'system');
+                        this.isOnline = true;
+                        this.updateStatus('online');
+                        this.enableControls();
+                        this.log('SUCCESS', `Peer connection established: ${id}`);
+                        this.addSystemMessage('ONYX network connection established');
+                        
+                        gsap.to('#statusDot', {
+                            duration: 0.5,
+                            scale: 1.2,
+                            repeat: -1,
+                            yoyo: true,
+                            ease: 'power2.inOut'
+                        });
                     });
 
                     this.peer.on('connection', (conn) => {
@@ -544,29 +656,45 @@
                     });
 
                     this.peer.on('error', (err) => {
-                        this.updateStatus('disconnected');
-                        this.addMessage('System', `Connection error: ${err.type}`, 'error');
+                        this.isOnline = false;
+                        this.updateStatus('offline');
+                        this.log('ERROR', `PeerJS error: ${err.type} - ${err.message}`);
+                        this.showError('Connection failed: ' + err.message);
+                        this.addSystemMessage('Connection error: ' + err.message);
+                    });
+
+                    this.peer.on('close', () => {
+                        this.isOnline = false;
+                        this.updateStatus('offline');
+                        this.log('WARNING', 'Peer connection closed');
+                        this.addSystemMessage('Network connection lost');
                     });
 
                 } catch (error) {
-                    this.updateStatus('disconnected');
-                    this.addMessage('System', `Failed to start ONYX: ${error.message}`, 'error');
+                    this.isOnline = false;
+                    this.updateStatus('offline');
+                    this.log('ERROR', `Failed to start ONYX: ${error.message}`);
+                    this.showError('Network error: Unable to reach relay server');
+                    this.addSystemMessage('Network initialization failed');
                 }
             }
 
             connect() {
                 const remoteId = document.getElementById('remotePeerId').value.trim();
                 if (!remoteId) {
-                    this.addMessage('System', 'Please enter a valid peer ID', 'error');
+                    this.log('WARNING', 'No remote peer ID provided');
+                    this.addSystemMessage('Please enter a valid peer ID');
                     return;
                 }
 
                 try {
+                    this.log('INFO', `Attempting to connect to: ${remoteId}`);
                     const conn = this.peer.connect(remoteId);
                     this.handleConnection(conn);
-                    this.addMessage('System', `Connecting to ${remoteId}...`, 'info');
+                    this.addSystemMessage(`Connecting to ${remoteId}...`);
                 } catch (error) {
-                    this.addMessage('System', `Connection failed: ${error.message}`, 'error');
+                    this.log('ERROR', `Connection failed: ${error.message}`);
+                    this.addSystemMessage('Connection failed: ' + error.message);
                 }
             }
 
@@ -575,134 +703,65 @@
                 
                 conn.on('open', () => {
                     this.connections.set(peerId, conn);
-                    this.updatePeerList();
-                    this.addMessage('System', `Connected to ${peerId}`, 'success');
+                    this.log('SUCCESS', `Connection established with ${peerId}`);
+                    this.addSystemMessage(`Connected to ${peerId}`);
                     this.enableChat();
                     
-                    // Exchange encryption keys
-                    this.encryption.exportKey().then(key => {
-                        conn.send({ type: 'key_exchange', key });
+                    gsap.from(`#messagesContainer`, {
+                        duration: 0.5,
+                        opacity: 0.5,
+                        ease: 'power2.out'
                     });
                 });
 
-                conn.on('data', async (data) => {
-                    if (data.type === 'key_exchange') {
-                        await this.encryption.importKey(data.key);
-                        this.addMessage('System', `Encryption key exchanged with ${peerId}`, 'success');
-                    } else if (data.type === 'message') {
-                        try {
-                            const decrypted = await this.encryption.decrypt(data.content);
-                            this.addMessage(peerId, decrypted, 'received');
-                        } catch (error) {
-                            this.addMessage('System', `Failed to decrypt message from ${peerId}`, 'error');
-                        }
-                    } else if (data.type === 'file') {
-                        this.handleFileReceive(peerId, data);
+                conn.on('data', (data) => {
+                    if (data.type === 'message') {
+                        this.log('INFO', `Message received from ${peerId}`);
+                        this.addMessage(peerId, data.content, 'received');
+                    } else if (data.type === 'system') {
+                        this.log('INFO', `System message from ${peerId}: ${data.content}`);
+                        this.addSystemMessage(`${peerId}: ${data.content}`);
                     }
                 });
 
                 conn.on('close', () => {
                     this.connections.delete(peerId);
-                    this.updatePeerList();
-                    this.addMessage('System', `Disconnected from ${peerId}`, 'info');
+                    this.log('WARNING', `Disconnected from ${peerId}`);
+                    this.addSystemMessage(`Disconnected from ${peerId}`);
+                    
                     if (this.connections.size === 0) {
                         this.disableChat();
                     }
                 });
 
                 conn.on('error', (err) => {
-                    this.addMessage('System', `Connection error with ${peerId}: ${err.type}`, 'error');
+                    this.log('ERROR', `Connection error with ${peerId}: ${err.type}`);
+                    this.addSystemMessage(`Error with ${peerId}: ${err.type}`);
                 });
             }
 
-            async sendMessage() {
+            sendMessage() {
                 const input = document.getElementById('messageInput');
                 const message = input.value.trim();
                 
                 if (!message) return;
 
-                try {
-                    const encrypted = await this.encryption.encrypt(message);
-                    
-                    this.connections.forEach(conn => {
-                        conn.send({
-                            type: 'message',
-                            content: encrypted
-                        });
-                    });
-
-                    this.addMessage('You', message, 'sent');
-                    input.value = '';
-                } catch (error) {
-                    this.addMessage('System', `Failed to send message: ${error.message}`, 'error');
-                }
-            }
-
-            sendFiles() {
-                const fileInput = document.getElementById('fileInput');
-                const files = fileInput.files;
+                this.log('INFO', `Broadcasting message to ${this.connections.size} peers`);
                 
-                if (files.length === 0) {
-                    this.addMessage('System', 'Please select files to send', 'error');
-                    return;
-                }
-
-                Array.from(files).forEach(file => {
-                    const reader = new FileReader();
-                    reader.onload = (e) => {
-                        const fileData = {
-                            type: 'file',
-                            name: file.name,
-                            size: file.size,
-                            data: Array.from(new Uint8Array(e.target.result))
-                        };
-
-                        this.connections.forEach(conn => {
-                            conn.send(fileData);
-                        });
-
-                        this.addMessage('System', `Sent file: ${file.name}`, 'success');
-                        this.addFileToList(file.name, file.size, 'sent');
-                    };
-                    reader.readAsArrayBuffer(file);
+                this.connections.forEach(conn => {
+                    conn.send({
+                        type: 'message',
+                        content: message,
+                        timestamp: Date.now()
+                    });
                 });
 
-                fileInput.value = '';
-            }
-
-            handleFileReceive(peerId, fileData) {
-                const { name, size, data } = fileData;
-                const blob = new Blob([new Uint8Array(data)]);
-                const url = URL.createObjectURL(blob);
-                
-                this.addMessage('System', `Received file: ${name} from ${peerId}`, 'success');
-                this.addFileToList(name, size, 'received', url);
-            }
-
-            addFileToList(name, size, type, url = null) {
-                const fileList = document.getElementById('fileList');
-                const fileItem = document.createElement('div');
-                fileItem.className = 'file-item';
-                
-                const sizeText = (size / 1024).toFixed(2) + ' KB';
-                
-                if (url) {
-                    fileItem.innerHTML = `
-                        <span>${name} (${sizeText})</span>
-                        <a href="${url}" download="${name}" style="color: #00ffff; text-decoration: none;">Download</a>
-                    `;
-                } else {
-                    fileItem.innerHTML = `
-                        <span>${name} (${sizeText})</span>
-                        <span style="color: #ff00ff;">Sent</span>
-                    `;
-                }
-                
-                fileList.appendChild(fileItem);
+                this.addMessage('You', message, 'sent');
+                input.value = '';
             }
 
             addMessage(sender, content, type) {
-                const messages = document.getElementById('messages');
+                const container = document.getElementById('messagesContainer');
                 const messageDiv = document.createElement('div');
                 messageDiv.className = `message ${type === 'sent' ? 'own' : ''}`;
                 
@@ -712,71 +771,119 @@
                     <div class="message-content">${content}</div>
                 `;
                 
-                messages.appendChild(messageDiv);
-                messages.scrollTop = messages.scrollHeight;
-            }
+                container.appendChild(messageDiv);
+                container.scrollTop = container.scrollHeight;
 
-            updatePeerList() {
-                const peerList = document.getElementById('peerList');
-                
-                if (this.connections.size === 0) {
-                    peerList.innerHTML = '<p style="color: #666; text-align: center;">No peers connected</p>';
-                    return;
-                }
-
-                peerList.innerHTML = '';
-                this.connections.forEach((conn, peerId) => {
-                    const peerItem = document.createElement('div');
-                    peerItem.className = 'peer-item connected';
-                    peerItem.textContent = peerId;
-                    peerItem.addEventListener('click', () => {
-                        document.getElementById('remotePeerId').value = peerId;
-                    });
-                    peerList.appendChild(peerItem);
+                // GSAP animation for message appearance
+                gsap.from(messageDiv, {
+                    duration: 0.4,
+                    x: type === 'sent' ? 20 : -20,
+                    opacity: 0,
+                    ease: 'power2.out'
                 });
             }
 
+            addSystemMessage(content) {
+                this.addMessage('SYSTEM', content, 'system');
+            }
+
+            log(level, message) {
+                const container = document.getElementById('logContainer');
+                const logEntry = document.createElement('div');
+                logEntry.className = `log-entry ${level.toLowerCase()}`;
+                
+                const timestamp = new Date().toLocaleTimeString();
+                logEntry.innerHTML = `
+                    <span class="log-timestamp">[${timestamp}]</span>
+                    <span class="log-level">${level}:</span>
+                    <span class="log-message">${message}</span>
+                `;
+                
+                container.appendChild(logEntry);
+                container.scrollTop = container.scrollHeight;
+
+                // GSAP animation for log entry
+                gsap.from(logEntry, {
+                    duration: 0.3,
+                    x: -10,
+                    opacity: 0,
+                    ease: 'power2.out'
+                });
+
+                // Keep only last 100 log entries
+                while (container.children.length > 100) {
+                    container.removeChild(container.firstChild);
+                }
+            }
+
             updateStatus(status) {
-                const statusElement = document.getElementById('status');
-                statusElement.className = `status ${status}`;
+                const statusDot = document.getElementById('statusDot');
+                const statusText = document.getElementById('statusText');
+                
+                statusDot.className = 'status-dot';
                 
                 switch(status) {
-                    case 'connected':
-                        statusElement.textContent = 'Connected to ONYX Network';
+                    case 'online':
+                        statusDot.classList.add('online');
+                        statusText.textContent = 'ONLINE';
                         break;
                     case 'connecting':
-                        statusElement.textContent = 'Connecting...';
+                        statusText.textContent = 'CONNECTING';
                         break;
-                    case 'disconnected':
-                        statusElement.textContent = 'Disconnected';
+                    case 'offline':
+                        statusText.textContent = 'OFFLINE';
                         break;
                 }
+            }
+
+            enableControls() {
+                document.getElementById('startBtn').disabled = true;
+                document.getElementById('startBtn').textContent = 'ONYX Active';
+                document.getElementById('connectBtn').disabled = false;
+                document.getElementById('copyIdBtn').disabled = false;
             }
 
             enableChat() {
                 document.getElementById('messageInput').disabled = false;
                 document.getElementById('sendBtn').disabled = false;
-                document.getElementById('fileInput').disabled = false;
-                document.getElementById('sendFileBtn').disabled = false;
             }
 
             disableChat() {
                 document.getElementById('messageInput').disabled = true;
                 document.getElementById('sendBtn').disabled = true;
-                document.getElementById('fileInput').disabled = true;
-                document.getElementById('sendFileBtn').disabled = true;
+            }
+
+            showError(message) {
+                const errorWarning = document.getElementById('errorWarning');
+                errorWarning.textContent = message;
+                errorWarning.style.display = 'block';
+                
+                gsap.from(errorWarning, {
+                    duration: 0.5,
+                    opacity: 0,
+                    scale: 0.8,
+                    ease: 'elastic.out'
+                });
+                
+                setTimeout(() => {
+                    errorWarning.style.display = 'none';
+                }, 5000);
             }
 
             copyId() {
-                const peerId = document.getElementById('peerId').value;
-                navigator.clipboard.writeText(peerId).then(() => {
-                    this.addMessage('System', 'Peer ID copied to clipboard', 'success');
+                navigator.clipboard.writeText(this.peerId).then(() => {
+                    this.log('SUCCESS', 'Peer ID copied to clipboard');
+                    this.addSystemMessage('Peer ID copied to clipboard');
+                }).catch(err => {
+                    this.log('ERROR', 'Failed to copy peer ID');
                 });
             }
         }
 
-        // Initialize ONYX Messenger
-        const onyx = new OnyxMessenger();
+        // Initialize ONYX Messenger when page loads
+        window.addEventListener('DOMContentLoaded', () => {
+            const onyx = new OnyxMessenger();
+        });
     </script>
 </body>
 </html>
