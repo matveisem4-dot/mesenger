@@ -17,17 +17,13 @@ jobs:
         shell: cmd
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
       - name: Install
         run: pip install pywebview pyinstaller
-
       - name: Build EXE
         run: pyinstaller --onefile --noconsole --name SecureMessenger client.py
-
       - uses: actions/upload-artifact@v4
         with:
           name: SecureMessenger-Windows
@@ -38,36 +34,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Create main.py for mobile
+      - name: Create mobile files
         run: |
           cat > main.py << 'EOF'
           from kivy.app import App
-          from kivy.uix.boxlayout import BoxLayout
           from kivy.uix.label import Label
-          from kivy.clock import Clock
           from kivy.utils import platform
-          import os
+          from kivy.clock import Clock
 
           class MessengerApp(App):
               def build(self):
-                  self.title = 'SecureMessenger'
-                  lo = BoxLayout(orientation='vertical')
-                  lo.add_widget(Label(text='SecureMessenger'))
-                  Clock.schedule_once(self.open_app, 1)
-                  return lo
-              def open_app(self, dt):
+                  self.lbl = Label(text='SecureMessenger\nLoading...')
+                  Clock.schedule_once(self.go, 2)
+                  return self.lbl
+              def go(self, dt):
                   url = 'https://your-server.com'
                   if platform == 'android':
                       from jnius import autoclass
                       Intent = autoclass('android.content.Intent')
                       Uri = autoclass('android.net.Uri')
                       PA = autoclass('org.kivy.android.PythonActivity')
-                      i = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                      PA.mActivity.startActivity(i)
+                      PA.mActivity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
                   else:
                       import webbrowser
                       webbrowser.open(url)
@@ -75,46 +62,30 @@ jobs:
               MessengerApp().run()
           EOF
 
-      - name: Create buildozer.spec
-        run: |
-          cat > buildozer.spec << 'EOF'
+          cat > buildozer.spec << 'SPEC'
           [app]
           title = SecureMessenger
-          package.name = securemessenger
+          package.name = securemsg
           package.domain = com.sm
           source.dir = .
           source.include_exts = py
-          version = 1.0.0
-          requirements = python3,kivy
+          version = 1.0
+          requirements = python3,kivy,android,jnius
           android.permissions = INTERNET
           android.api = 33
-          android.minapi = 24
-          android.arch = arm64-v8a
+          android.minapi = 21
+          android.archs = arm64-v8a
           orientation = portrait
           fullscreen = 0
           [buildozer]
           log_level = 2
-          EOF
-
-      - name: Install system deps
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            build-essential git python3-dev \
-            ffmpeg libsdl2-dev libsdl2-image-dev \
-            libsdl2-mixer-dev libsdl2-ttf-dev \
-            libportmidi-dev libswscale-dev \
-            libavformat-dev libavcodec-dev \
-            zlib1g-dev libunwind-dev lld \
-            autoconf automake libtool \
-            openjdk-17-jdk unzip zip
-
-      - name: Install buildozer
-        run: pip install buildozer cython
+          SPEC
 
       - name: Build APK
-        run: |
-          yes | buildozer android debug 2>&1 | tail -100
+        uses: ArtemSBulgakov/buildozer-action@v1
+        id: buildozer
+        with:
+          command: buildozer android debug
 
       - uses: actions/upload-artifact@v4
         with:
