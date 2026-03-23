@@ -28,13 +28,16 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
+        shell: cmd
         run: pip install pywebview pyinstaller
 
       - name: Patch server URL
+        shell: cmd
         run: |
-          (Get-Content client.py) -replace 'http://localhost:5000', '${{ env.SERVER_URL }}' | Set-Content client.py
+          python -c "f=open('client.py','r');d=f.read();f.close();d=d.replace('http://localhost:5000','%SERVER_URL%');f=open('client.py','w');f.write(d);f.close()"
 
       - name: Build EXE
+        shell: cmd
         run: pyinstaller --onefile --noconsole --name SecureMessenger client.py
 
       - name: Upload EXE
@@ -60,9 +63,7 @@ jobs:
           from kivy.uix.label import Label
           from kivy.clock import Clock
           from kivy.utils import platform
-          import os, certifi
-
-          SERVER = os.environ.get('SM_SERVER', '${{ env.SERVER_URL }}')
+          import os
 
           class SecureMessengerApp(App):
               def build(self):
@@ -71,21 +72,18 @@ jobs:
                   layout.add_widget(Label(text='Loading...'))
                   Clock.schedule_once(self.open_messenger, 1)
                   return layout
-
               def open_messenger(self, dt):
                   if platform == 'android':
                       from jnius import autoclass
                       Intent = autoclass('android.content.Intent')
                       Uri = autoclass('android.net.Uri')
                       PA = autoclass('org.kivy.android.PythonActivity')
-                      intent = Intent(Intent.ACTION_VIEW, Uri.parse(SERVER))
+                      intent = Intent(Intent.ACTION_VIEW, Uri.parse('${{ env.SERVER_URL }}'))
                       PA.mActivity.startActivity(intent)
                   else:
                       import webbrowser
-                      webbrowser.open(SERVER)
-
+                      webbrowser.open('${{ env.SERVER_URL }}')
           if __name__ == '__main__':
-              os.environ['SSL_CERT_FILE'] = certifi.where()
               SecureMessengerApp().run()
           EOF
 
@@ -99,9 +97,7 @@ jobs:
             libsdl2-mixer-dev libsdl2-ttf-dev \
             libportmidi-dev libswscale-dev \
             libavformat-dev libavcodec-dev \
-            zlib1g-dev libgstreamer1.0 \
-            gstreamer1.0-plugins-base \
-            libunwind-dev lld \
+            zlib1g-dev libunwind-dev lld \
             autoconf automake libtool \
             openjdk-17-jdk unzip zip
 
@@ -126,7 +122,3 @@ jobs:
           files: |
             SecureMessenger-Windows/SecureMessenger.exe
             SecureMessenger-Android/*.apk
-          body: |
-            ## SecureMessenger
-            - Windows: SecureMessenger.exe
-            - Android: SecureMessenger.apk
