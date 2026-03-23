@@ -1,25 +1,19 @@
-name: Build EXE + APK
+name: Build
 
 on:
   push:
     tags: ['v*']
   workflow_dispatch:
-    inputs:
-      server_url:
-        description: 'URL сервера'
-        required: true
-        default: 'https://your-server.com'
 
 permissions:
   contents: write
 
-env:
-  SERVER_URL: ${{ github.event.inputs.server_url || 'https://your-server.com' }}
-
 jobs:
-
   build-exe:
     runs-on: windows-latest
+    defaults:
+      run:
+        shell: cmd
     steps:
       - uses: actions/checkout@v4
 
@@ -27,98 +21,13 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install dependencies
-        shell: cmd
+      - name: Install
         run: pip install pywebview pyinstaller
 
-      - name: Patch server URL
-        shell: cmd
-        run: |
-          python -c "f=open('client.py','r');d=f.read();f.close();d=d.replace('http://localhost:5000','%SERVER_URL%');f=open('client.py','w');f.write(d);f.close()"
-
       - name: Build EXE
-        shell: cmd
         run: pyinstaller --onefile --noconsole --name SecureMessenger client.py
 
-      - name: Upload EXE
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: SecureMessenger-Windows
-          path: dist/SecureMessenger.exe
-
-  build-apk:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Create mobile app
-        run: |
-          cat > main.py << 'EOF'
-          from kivy.app import App
-          from kivy.uix.boxlayout import BoxLayout
-          from kivy.uix.label import Label
-          from kivy.clock import Clock
-          from kivy.utils import platform
-          import os
-
-          class SecureMessengerApp(App):
-              def build(self):
-                  self.title = 'SecureMessenger'
-                  layout = BoxLayout(orientation='vertical')
-                  layout.add_widget(Label(text='Loading...'))
-                  Clock.schedule_once(self.open_messenger, 1)
-                  return layout
-              def open_messenger(self, dt):
-                  if platform == 'android':
-                      from jnius import autoclass
-                      Intent = autoclass('android.content.Intent')
-                      Uri = autoclass('android.net.Uri')
-                      PA = autoclass('org.kivy.android.PythonActivity')
-                      intent = Intent(Intent.ACTION_VIEW, Uri.parse('${{ env.SERVER_URL }}'))
-                      PA.mActivity.startActivity(intent)
-                  else:
-                      import webbrowser
-                      webbrowser.open('${{ env.SERVER_URL }}')
-          if __name__ == '__main__':
-              SecureMessengerApp().run()
-          EOF
-
-      - name: Install Buildozer
-        run: |
-          pip install buildozer cython
-          sudo apt-get update
-          sudo apt-get install -y \
-            build-essential git python3-dev \
-            ffmpeg libsdl2-dev libsdl2-image-dev \
-            libsdl2-mixer-dev libsdl2-ttf-dev \
-            libportmidi-dev libswscale-dev \
-            libavformat-dev libavcodec-dev \
-            zlib1g-dev libunwind-dev lld \
-            autoconf automake libtool \
-            openjdk-17-jdk unzip zip
-
-      - name: Build APK
-        run: buildozer android debug 2>&1 | tail -50
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: SecureMessenger-Android
-          path: bin/*.apk
-
-  release:
-    needs: [build-exe, build-apk]
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
-    steps:
-      - uses: actions/download-artifact@v4
-
-      - uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            SecureMessenger-Windows/SecureMessenger.exe
-            SecureMessenger-Android/*.apk
+          path: dist\SecureMessenger.exe
