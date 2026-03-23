@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       server_url:
-        description: 'URL сервера мессенджера'
+        description: 'URL сервера'
         required: true
         default: 'https://your-server.com'
 
@@ -18,7 +18,6 @@ env:
 
 jobs:
 
-  # ══════════ СБОРКА EXE (Windows) ══════════
   build-exe:
     runs-on: windows-latest
     steps:
@@ -29,29 +28,14 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: |
-          pip install pywebview pyinstaller
+        run: pip install pywebview pyinstaller
 
-      - name: Obfuscate code
+      - name: Patch server URL
         run: |
-          python -c "
-          import py_compile, compileall
-          compileall.compile_dir('.', force=True)
-          "
+          (Get-Content client.py) -replace 'http://localhost:5000', '${{ env.SERVER_URL }}' | Set-Content client.py
 
       - name: Build EXE
-        run: |
-          python -c "
-          # Подставляем URL сервера
-          with open('client.py','r') as f: code = f.read()
-          code = code.replace('http://localhost:5000','${{ env.SERVER_URL }}')
-          with open('client.py','w') as f: f.write(code)
-          "
-          pyinstaller --onefile --noconsole ^
-            --name SecureMessenger ^
-            --icon NONE ^
-            --add-data "client.py;." ^
-            client.py
+        run: pyinstaller --onefile --noconsole --name SecureMessenger client.py
 
       - name: Upload EXE
         uses: actions/upload-artifact@v4
@@ -59,7 +43,6 @@ jobs:
           name: SecureMessenger-Windows
           path: dist/SecureMessenger.exe
 
-  # ══════════ СБОРКА APK (Android) ══════════
   build-apk:
     runs-on: ubuntu-latest
     steps:
@@ -71,7 +54,7 @@ jobs:
 
       - name: Create mobile app
         run: |
-          cat > main.py << 'MOBILE_EOF'
+          cat > main.py << 'EOF'
           from kivy.app import App
           from kivy.uix.boxlayout import BoxLayout
           from kivy.uix.label import Label
@@ -85,7 +68,7 @@ jobs:
               def build(self):
                   self.title = 'SecureMessenger'
                   layout = BoxLayout(orientation='vertical')
-                  layout.add_widget(Label(text='Загрузка...'))
+                  layout.add_widget(Label(text='Loading...'))
                   Clock.schedule_once(self.open_messenger, 1)
                   return layout
 
@@ -94,10 +77,9 @@ jobs:
                       from jnius import autoclass
                       Intent = autoclass('android.content.Intent')
                       Uri = autoclass('android.net.Uri')
-                      PythonActivity = autoclass('org.kivy.android.PythonActivity')
+                      PA = autoclass('org.kivy.android.PythonActivity')
                       intent = Intent(Intent.ACTION_VIEW, Uri.parse(SERVER))
-                      currentActivity = PythonActivity.mActivity
-                      currentActivity.startActivity(intent)
+                      PA.mActivity.startActivity(intent)
                   else:
                       import webbrowser
                       webbrowser.open(SERVER)
@@ -105,7 +87,7 @@ jobs:
           if __name__ == '__main__':
               os.environ['SSL_CERT_FILE'] = certifi.where()
               SecureMessengerApp().run()
-          MOBILE_EOF
+          EOF
 
       - name: Install Buildozer
         run: |
@@ -124,8 +106,7 @@ jobs:
             openjdk-17-jdk unzip zip
 
       - name: Build APK
-        run: |
-          buildozer android debug 2>&1 | tail -50
+        run: buildozer android debug 2>&1 | tail -50
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
@@ -133,25 +114,19 @@ jobs:
           name: SecureMessenger-Android
           path: bin/*.apk
 
-  # ══════════ РЕЛИЗ ══════════
   release:
     needs: [build-exe, build-apk]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
+      - uses: softprops/action-gh-release@v1
         with:
           files: |
             SecureMessenger-Windows/SecureMessenger.exe
             SecureMessenger-Android/*.apk
           body: |
-            ## 🔐 SecureMessenger
-            ### Скачать:
-            - 🖥️ **Windows**: SecureMessenger.exe
-            - 📱 **Android**: SecureMessenger.apk
-          draft: false
-          prerelease: false
+            ## SecureMessenger
+            - Windows: SecureMessenger.exe
+            - Android: SecureMessenger.apk
