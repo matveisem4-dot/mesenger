@@ -20,9 +20,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - run: pip install pywebview pyinstaller
-      - run: pyinstaller --onefile --noconsole --name SecureMessenger client.py
-      - uses: actions/upload-artifact@v4
+      - name: Установка зависимостей
+        run: pip install pywebview pyinstaller
+      - name: Сборка EXE
+        run: pyinstaller --onefile --noconsole --name SecureMessenger client.py
+      - name: Загрузить EXE
+        uses: actions/upload-artifact@v4
         with:
           name: SecureMessenger-Windows
           path: dist\SecureMessenger.exe
@@ -34,15 +37,22 @@ jobs:
         with:
           node-version: 20
 
-      - name: Установка официального инструмента Google
-        run: npm install -g @bubblewrap/cli
+      - name: Установка официального инструмента
+        run: npm install -g pwabuilder-cli
 
       - name: Сборка APK
         run: |
-          bubblewrap init --url https://твой-сервер.com --name SecureMessenger --package com.securemessenger
-          bubblewrap build --skipSigning --skipPwaValidation
+          pwabuilder build android --url https://твой-сервер.com \
+            --name SecureMessenger \
+            --packageId com.securemessenger \
+            --version 1.0.0 \
+            --display standalone \
+            --orientation portrait \
+            --enableCamera true \
+            --enableMicrophone true
 
-      - uses: actions/upload-artifact@v4
+      - name: Загрузить APK
+        uses: actions/upload-artifact@v4
         with:
           name: SecureMessenger-Android
-          path: *.apk
+          path: output/android/*.apk
