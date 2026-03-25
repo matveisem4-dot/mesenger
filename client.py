@@ -1,7 +1,7 @@
 import webview
 import sys
 
-SERVER = "https://xxxxx.trycloudflare.com"
+SERVER = "https://tune-michelle-mia-charles.trycloudflare.com/"
 
 if len(sys.argv) > 1:
     SERVER = sys.argv[1]
