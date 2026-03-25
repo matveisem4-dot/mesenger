@@ -1,0 +1,52 @@
+name: Server 24/7
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 */5 * * *'
+
+jobs:
+  server:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Установка
+        run: pip install flask flask-socketio simple-websocket cryptography bcrypt
+
+      - name: Запуск сервера
+        env:
+          SK: ${{ secrets.SK }}
+          AK: ${{ secrets.AK }}
+        run: |
+          # Ставим cloudflared для туннеля
+          wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
+          chmod +x cloudflared-linux-amd64
+
+          # Запускаем сервер
+          python app.py &
+          sleep 3
+
+          # Запускаем туннель — даёт публичный URL
+          ./cloudflared-linux-amd64 tunnel --url http://localhost:5000 2>&1 | tee tunnel.log &
+          sleep 5
+
+          # Показываем URL
+          URL=$(grep -o 'https://[a-z0-9\-]*\.trycloudflare\.com' tunnel.log | head -1)
+          echo "=================================="
+          echo "СЕРВЕР РАБОТАЕТ"
+          echo "URL: $URL"
+          echo "=================================="
+
+          # Сохраняем URL в файл
+          echo "$URL" > server_url.txt
+
+          # Держим процесс живым и пишем лог каждые 5 минут
+          while true; do
+            echo "$(date) - сервер работает - $(curl -s -o /dev/null -w '%{http_code}' http://localhost:5000)"
+            sleep 300
+          done
