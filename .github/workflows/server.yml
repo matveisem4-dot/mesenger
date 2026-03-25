@@ -15,38 +15,78 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Установка
+      - name: Установка зависимостей
         run: pip install flask flask-socketio simple-websocket cryptography bcrypt
 
-      - name: Запуск сервера
-        env:
-          SK: ${{ secrets.SK }}
-          AK: ${{ secrets.AK }}
+      - name: Запуск
         run: |
-          # Ставим cloudflared для туннеля
-          wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
-          chmod +x cloudflared-linux-amd64
+          # Скачиваем cloudflared
+          wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -O cloudflared
+          chmod +x cloudflared
 
-          # Запускаем сервер
-          python app.py &
-          sleep 3
+          # Запускаем сервер в фоне
+          nohup python app.py > server.log 2>&1 &
+          SERVER_PID=$!
 
-          # Запускаем туннель — даёт публичный URL
-          ./cloudflared-linux-amd64 tunnel --url http://localhost:5000 2>&1 | tee tunnel.log &
-          sleep 5
+          # Ждём пока сервер точно запустится
+          echo "Ожидание запуска сервера..."
+          for i in $(seq 1 30); do
+            if curl -s http://localhost:5000 > /dev/null 2>&1; then
+              echo "Сервер запустился за ${i} секунд"
+              break
+            fi
+            sleep 1
+          done
 
-          # Показываем URL
-          URL=$(grep -o 'https://[a-z0-9\-]*\.trycloudflare\.com' tunnel.log | head -1)
-          echo "=================================="
-          echo "СЕРВЕР РАБОТАЕТ"
-          echo "URL: $URL"
-          echo "=================================="
+          # Проверяем что сервер жив
+          if ! curl -s http://localhost:5000 > /dev/null 2>&1; then
+            echo "ОШИБКА: сервер не запустился!"
+            echo "=== Логи сервера ==="
+            cat server.log
+            exit 1
+          fi
 
-          # Сохраняем URL в файл
-          echo "$URL" > server_url.txt
+          echo "Сервер работает, запускаем туннель..."
 
-          # Держим процесс живым и пишем лог каждые 5 минут
+          # Запускаем туннель
+          ./cloudflared tunnel --url http://localhost:5000 > tunnel.log 2>&1 &
+          TUNNEL_PID=$!
+          sleep 10
+
+          # Достаём URL
+          URL=$(grep -oP 'https://[a-z0-9\-]+\.trycloudflare\.com' tunnel.log | head -1)
+
+          if [ -z "$URL" ]; then
+            echo "ОШИБКА: туннель не создался!"
+            echo "=== Логи туннеля ==="
+            cat tunnel.log
+            exit 1
+          fi
+
+          echo ""
+          echo "=========================================="
+          echo "  СЕРВЕР РАБОТАЕТ!"
+          echo ""
+          echo "  URL: $URL"
+          echo ""
+          echo "  Скопируйте этот URL и вставьте"
+          echo "  в приложение SecureMessenger"
+          echo "=========================================="
+          echo ""
+
+          # Держим процесс живым
           while true; do
-            echo "$(date) - сервер работает - $(curl -s -o /dev/null -w '%{http_code}' http://localhost:5000)"
-            sleep 300
+            # Проверяем что сервер жив
+            STATUS=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:5000 2>/dev/null || echo "dead")
+
+            if [ "$STATUS" = "dead" ] || [ "$STATUS" = "000" ]; then
+              echo "$(date) - Сервер упал, перезапускаем..."
+              nohup python app.py > server.log 2>&1 &
+              SERVER_PID=$!
+              sleep 5
+            else
+              echo "$(date) - OK (HTTP $STATUS) - $URL"
+            fi
+
+            sleep 120
           done
