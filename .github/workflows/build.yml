@@ -1,0 +1,234 @@
+name: Build Release
+
+on:
+  push:
+    branches: ['main']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+
+  build-exe:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Установка
+        run: pip install pywebview pyinstaller
+      - name: Сборка
+        run: pyinstaller --onefile --noconsole --name SecureMessenger client.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: exe
+          path: dist\SecureMessenger.exe
+
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Создать проект
+        run: |
+          mkdir -p app/src/main/java/com/securemessenger
+          mkdir -p app/src/main/res/values
+          mkdir -p app/src/main/res/drawable
+
+          cat > app/src/main/AndroidManifest.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+              package="com.securemessenger">
+              <uses-permission android:name="android.permission.INTERNET"/>
+              <uses-permission android:name="android.permission.CAMERA"/>
+              <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+              <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
+              <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+              <application
+                  android:label="SecureMessenger"
+                  android:icon="@drawable/ic_launcher"
+                  android:usesCleartextTraffic="true"
+                  android:theme="@style/AppTheme">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true"
+                      android:configChanges="orientation|screenSize|keyboardHidden">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN"/>
+                          <category android:name="android.intent.category.LAUNCHER"/>
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          EOF
+
+          cat > app/src/main/java/com/securemessenger/MainActivity.java << 'EOF'
+          package com.securemessenger;
+          import android.app.Activity;
+          import android.app.AlertDialog;
+          import android.os.Bundle;
+          import android.webkit.*;
+          import android.view.Window;
+          import android.widget.EditText;
+          import android.widget.LinearLayout;
+          import android.Manifest;
+          import android.content.pm.PackageManager;
+          import android.content.SharedPreferences;
+          import android.graphics.Color;
+
+          public class MainActivity extends Activity {
+              private WebView webView;
+
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  requestWindowFeature(Window.FEATURE_NO_TITLE);
+                  getWindow().setStatusBarColor(Color.parseColor("#0a0a0f"));
+                  getWindow().setNavigationBarColor(Color.parseColor("#0a0a0f"));
+
+                  String[] perms = {Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO};
+                  for (String p : perms) {
+                      if (checkSelfPermission(p) != PackageManager.PERMISSION_GRANTED) {
+                          requestPermissions(perms, 1);
+                          break;
+                      }
+                  }
+
+                  SharedPreferences prefs = getSharedPreferences("sm", MODE_PRIVATE);
+                  String saved = prefs.getString("url", "");
+                  if (saved.isEmpty()) askUrl(prefs);
+                  else loadApp(saved);
+              }
+
+              private void askUrl(SharedPreferences prefs) {
+                  LinearLayout l = new LinearLayout(this);
+                  l.setPadding(50, 30, 50, 10);
+                  EditText input = new EditText(this);
+                  input.setHint("https://xxxxx.trycloudflare.com");
+                  l.addView(input);
+
+                  new AlertDialog.Builder(this)
+                      .setTitle("SecureMessenger")
+                      .setMessage("Введите URL сервера из логов GitHub Actions")
+                      .setView(l)
+                      .setCancelable(false)
+                      .setPositiveButton("OK", (d, w) -> {
+                          String url = input.getText().toString().trim();
+                          if (!url.startsWith("http")) url = "https://" + url;
+                          prefs.edit().putString("url", url).apply();
+                          loadApp(url);
+                      })
+                      .setNeutralButton("Сброс", (d, w) -> {
+                          prefs.edit().remove("url").apply();
+                          askUrl(prefs);
+                      })
+                      .show();
+              }
+
+              private void loadApp(String url) {
+                  webView = new WebView(this);
+                  webView.setBackgroundColor(Color.parseColor("#0a0a0f"));
+                  setContentView(webView);
+                  WebSettings s = webView.getSettings();
+                  s.setJavaScriptEnabled(true);
+                  s.setDomStorageEnabled(true);
+                  s.setMediaPlaybackRequiresUserGesture(false);
+                  s.setDatabaseEnabled(true);
+                  webView.setWebViewClient(new WebViewClient());
+                  webView.setWebChromeClient(new WebChromeClient() {
+                      @Override
+                      public void onPermissionRequest(PermissionRequest req) {
+                          req.grant(req.getResources());
+                      }
+                  });
+                  webView.loadUrl(url);
+              }
+
+              @Override
+              public void onBackPressed() {
+                  if (webView != null && webView.canGoBack()) webView.goBack();
+              }
+          }
+          EOF
+
+          cat > app/src/main/res/values/styles.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <style name="AppTheme" parent="android:Theme.Material.NoActionBar">
+                  <item name="android:windowBackground">#0a0a0f</item>
+                  <item name="android:statusBarColor">#0a0a0f</item>
+                  <item name="android:navigationBarColor">#0a0a0f</item>
+              </style>
+          </resources>
+          EOF
+
+          cat > GenIcon.java << 'ICON'
+          import java.awt.*;import java.awt.image.*;import javax.imageio.*;import java.io.*;
+          public class GenIcon{public static void main(String[] a)throws Exception{
+          int[] sz={48,72,96,144,192};String[] nm={"mdpi","hdpi","xhdpi","xxhdpi","xxxhdpi"};
+          for(int i=0;i<5;i++){int s=sz[i];BufferedImage img=new BufferedImage(s,s,BufferedImage.TYPE_INT_ARGB);
+          Graphics2D g=img.createGraphics();g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON);
+          g.setColor(new Color(10,10,15));g.fillRoundRect(0,0,s,s,s/4,s/4);g.setColor(new Color(0,212,255));
+          g.setFont(new Font("SansSerif",Font.BOLD,s*2/5));FontMetrics fm=g.getFontMetrics();
+          g.drawString("SM",(s-fm.stringWidth("SM"))/2,s/2+fm.getAscent()/3);g.dispose();
+          String dir="app/src/main/res/drawable-"+nm[i];new File(dir).mkdirs();
+          ImageIO.write(img,"PNG",new File(dir+"/ic_launcher.png"));}
+          BufferedImage img=new BufferedImage(96,96,BufferedImage.TYPE_INT_ARGB);Graphics2D g=img.createGraphics();
+          g.setColor(new Color(10,10,15));g.fillRoundRect(0,0,96,96,20,20);g.setColor(new Color(0,212,255));
+          g.setFont(new Font("SansSerif",Font.BOLD,38));g.drawString("SM",16,60);g.dispose();
+          new File("app/src/main/res/drawable").mkdirs();
+          ImageIO.write(img,"PNG",new File("app/src/main/res/drawable/ic_launcher.png"));}}
+          ICON
+          javac GenIcon.java && java GenIcon && rm GenIcon.java GenIcon.class
+
+          cat > app/build.gradle << 'EOF'
+          apply plugin: 'com.android.application'
+          android {
+              namespace 'com.securemessenger'
+              compileSdk 34
+              defaultConfig { applicationId "com.securemessenger"; minSdk 24; targetSdk 34; versionCode 1; versionName "1.0" }
+              buildTypes { release { minifyEnabled false }; debug { minifyEnabled false } }
+              compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+          }
+          EOF
+
+          cat > build.gradle << 'EOF'
+          buildscript { repositories { google(); mavenCentral() }; dependencies { classpath 'com.android.tools.build:gradle:8.2.0' } }
+          allprojects { repositories { google(); mavenCentral() } }
+          EOF
+
+          echo "include ':app'" > settings.gradle
+          printf "android.useAndroidX=false\norg.gradle.jvmargs=-Xmx2048m" > gradle.properties
+          gradle wrapper --gradle-version 8.5
+
+      - name: Сборка APK
+        run: ./gradlew assembleDebug
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+
+  pack:
+    needs: [build-exe, build-apk]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+      - name: Архив
+        run: |
+          mkdir SecureMessenger
+          cp exe/SecureMessenger.exe SecureMessenger/
+          cp apk/app-debug.apk SecureMessenger/SecureMessenger.apk
+          zip -r SecureMessenger.zip SecureMessenger/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SecureMessenger-Release
+          path: SecureMessenger.zip
