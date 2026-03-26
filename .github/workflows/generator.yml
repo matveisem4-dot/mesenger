@@ -2,7 +2,7 @@ name: Ultimate-Ghost-Builder
 on: [push, workflow_dispatch]
 
 jobs:
-  # Со сборкой Windows всё Ок, оставляем как есть
+  # Windows сборка уже работает, не трогаем её
   build-windows:
     runs-on: windows-latest
     steps:
@@ -23,17 +23,17 @@ jobs:
           name: GhostNet-EXE
           path: GhostNet-Windows.zip
 
+  # Android сборка: Режим "Игнорировать всё"
   build-android:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       
-      # Переходим на Java 21, так как логи требуют именно её
-      - name: Setup Java 21
+      - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
-          java-version: '21'
+          java-version: '17'
           
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -52,15 +52,18 @@ jobs:
           npx cap init GhostNet com.ghost.app --web-dir www
           npx cap add android
           
-      - name: Hard-Fix Android Config
+      - name: Force Fix Duplicates
         run: |
-          cd android
-          # Явно прописываем Java 21 и исправляем конфликты версий
-          echo "org.gradle.java.home=${JAVA_HOME_21_X64}" >> gradle.properties
-          echo "android.useAndroidX=true" >> gradle.properties
-          echo "android.enableJetifier=true" >> gradle.properties
-          # Принудительно ставим версию Kotlin, которая не глючит
-          sed -i 's/kotlin_version = .*/kotlin_version = "1.9.10"/' build.gradle
+          cd android/app
+          # Этот код разрешает дубликаты классов при сборке
+          echo "android {
+              packagingOptions {
+                  duplicatesStrategy = 'exclude'
+                  exclude 'META-INF/kotlin-stdlib.kotlin_module'
+                  exclude 'META-INF/kotlin-stdlib-jdk8.kotlin_module'
+                  exclude 'META-INF/kotlin-stdlib-jdk7.kotlin_module'
+              }
+          }" >> build.gradle
           
       - name: Build APK
         run: |
