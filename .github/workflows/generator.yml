@@ -1,7 +1,8 @@
-name: Ultimate-Ghost-Builder
+name: Ultimate-Fast-Builder
 on: [push, workflow_dispatch]
 
 jobs:
+  # СБОРКА ДЛЯ WINDOWS (EXE) - Работает стабильно
   build-windows:
     runs-on: windows-latest
     steps:
@@ -22,48 +23,22 @@ jobs:
           name: GhostNet-EXE
           path: GhostNet-Windows.zip
 
+  # НОВЫЙ СБОРЩИК ANDROID (БЕЗ CAPACITOR)
   build-android:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
-      - name: Setup Java 17
-        uses: actions/setup-java@v4
+      - name: Install Web-to-APK Tool
+        run: |
+          # Используем легкий инструмент упаковки
+          zip -r ghostnet.zip index.html
+      - name: Create APK via Action
+        uses: pavi2410/Web2App@v1
         with:
-          distribution: 'zulu'
-          java-version: '17'
-          
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      
-      - name: Prepare Project
-        run: |
-          npm init -y
-          npm install @capacitor/cli @capacitor/core @capacitor/android
-          mkdir -p www
-          cp index.html www/
-          
-      - name: Initialize Capacitor
-        run: |
-          npx cap init GhostNet com.ghost.app --web-dir www
-          npx cap add android
-          
-      - name: Fix Android Build Config
-        run: |
-          cd android/app
-          # Исправляем синтаксис для новых версий Gradle
-          sed -i '/android {/a \    packagingOptions {\n        resources {\n            excludes += ["META-INF/kotlin-stdlib.kotlin_module", "META-INF/kotlin-stdlib-jdk8.kotlin_module", "META-INF/kotlin-stdlib-jdk7.kotlin_module"]\n        }\n    }' build.gradle
-          
-      - name: Build APK
-        run: |
-          cd android
-          chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
-          
+          name: "GhostNet"
+          url: "file://${{ github.workspace }}/index.html" # Указываем локальный файл
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: GhostNet-APK
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          path: ./*.apk
