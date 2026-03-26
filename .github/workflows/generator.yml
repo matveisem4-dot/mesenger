@@ -2,7 +2,6 @@ name: Ultimate-Ghost-Builder
 on: [push, workflow_dispatch]
 
 jobs:
-  # Windows сборка уже работает, не трогаем её
   build-windows:
     runs-on: windows-latest
     steps:
@@ -23,7 +22,6 @@ jobs:
           name: GhostNet-EXE
           path: GhostNet-Windows.zip
 
-  # Android сборка: Режим "Игнорировать всё"
   build-android:
     runs-on: ubuntu-latest
     steps:
@@ -52,18 +50,11 @@ jobs:
           npx cap init GhostNet com.ghost.app --web-dir www
           npx cap add android
           
-      - name: Force Fix Duplicates
+      - name: Fix Android Build Config
         run: |
           cd android/app
-          # Этот код разрешает дубликаты классов при сборке
-          echo "android {
-              packagingOptions {
-                  duplicatesStrategy = 'exclude'
-                  exclude 'META-INF/kotlin-stdlib.kotlin_module'
-                  exclude 'META-INF/kotlin-stdlib-jdk8.kotlin_module'
-                  exclude 'META-INF/kotlin-stdlib-jdk7.kotlin_module'
-              }
-          }" >> build.gradle
+          # Исправляем синтаксис для новых версий Gradle
+          sed -i '/android {/a \    packagingOptions {\n        resources {\n            excludes += ["META-INF/kotlin-stdlib.kotlin_module", "META-INF/kotlin-stdlib-jdk8.kotlin_module", "META-INF/kotlin-stdlib-jdk7.kotlin_module"]\n        }\n    }' build.gradle
           
       - name: Build APK
         run: |
