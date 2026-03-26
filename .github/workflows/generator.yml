@@ -1,12 +1,9 @@
-name: Build-Ghost-Apps
-on: 
-  push:
-    branches: [main]
-  workflow_dispatch: # Позволяет запустить сборку кнопкой
+name: Ultimate-Ghost-Builder
+on: [push, workflow_dispatch]
 
 jobs:
-  build-pc:
-    name: Build EXE for Windows
+  # СБОРКА ДЛЯ WINDOWS (EXE)
+  build-windows:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -14,37 +11,52 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+      
       - name: Install Nativefier
         run: npm install -g nativefier
-      - name: Generate EXE
-        # Мы превращаем твой HTML в полноценное приложение
+      
+      - name: Create EXE
+        # Превращаем HTML в полноценное приложение .exe
         run: |
-          mkdir build
-          cp index.html build/index.html
-          nativefier --name "GhostNet" "file://${{ github.workspace }}/index.html" --platform "windows" ./dist
-      - name: Upload EXE
+          nativefier --name "GhostNet" --platform "windows" --arch "x64" "file://${{ github.workspace }}/index.html" --single-instance --internal-urls ".*"
+          Compress-Archive -Path "GhostNet-win32-x64" -DestinationPath "GhostNet-Windows.zip"
+
+      - name: Upload Windows App
         uses: actions/upload-artifact@v4
         with:
-          name: GhostNet-Windows
-          path: ./*.zip
+          name: GhostNet-EXE
+          path: GhostNet-Windows.zip
 
+  # СБОРКА ДЛЯ ANDROID (APK)
   build-android:
-    name: Build APK for Android
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Setup Java
-        uses: actions/setup-java@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          distribution: 'temurin'
-          java-version: '17'
-      - name: Build with Bubblewrap
+          node-version: 20
+      
+      - name: Install Tools
         run: |
-          # Этот блок подготавливает APK из твоего HTML
-          echo "Building Android Package..."
-          # В реальном репо здесь будет команда сборки через TWA или Cordova
+          npm install -g @capacitor/cli @capacitor/core
+          mkdir www
+          cp index.html www/
+          
+      - name: Initialize Android Project
+        # Создаем обертку для Android
+        run: |
+          npx cap init GhostNet com.ghost.app --web-dir www
+          npx cap add android
+          
+      - name: Build APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+          
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: GhostNet-Android
-          path: index.html # Пока сохраняем исходник, если полная сборка требует ключей подписи
+          name: GhostNet-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
