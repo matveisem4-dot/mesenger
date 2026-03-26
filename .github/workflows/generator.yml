@@ -2,7 +2,7 @@ name: Ultimate-Ghost-Builder
 on: [push, workflow_dispatch]
 
 jobs:
-  # СБОРКА ДЛЯ WINDOWS (EXE)
+  # СБОРКА EXE ДЛЯ WINDOWS (Обычно работает быстрее)
   build-windows:
     runs-on: windows-latest
     steps:
@@ -16,18 +16,17 @@ jobs:
         run: npm install -g nativefier
       
       - name: Create EXE
-        # Превращаем HTML в полноценное приложение .exe
         run: |
-          nativefier --name "GhostNet" --platform "windows" --arch "x64" "file://${{ github.workspace }}/index.html" --single-instance --internal-urls ".*"
+          nativefier --name "GhostNet" --platform "windows" --arch "x64" "file://${{ github.workspace }}/index.html" --single-instance
           Compress-Archive -Path "GhostNet-win32-x64" -DestinationPath "GhostNet-Windows.zip"
 
-      - name: Upload Windows App
+      - name: Upload EXE
         uses: actions/upload-artifact@v4
         with:
           name: GhostNet-EXE
           path: GhostNet-Windows.zip
 
-  # СБОРКА ДЛЯ ANDROID (APK)
+  # СБОРКА APK ДЛЯ ANDROID (Исправленная)
   build-android:
     runs-on: ubuntu-latest
     steps:
@@ -37,17 +36,24 @@ jobs:
         with:
           node-version: 20
       
-      - name: Install Tools
+      - name: Prepare Environment
         run: |
-          npm install -g @capacitor/cli @capacitor/core
+          # Создаем package.json, чтобы Capacitor не ругался
+          npm init -y
+          npm install @capacitor/cli @capacitor/core @capacitor/android
           mkdir www
           cp index.html www/
           
-      - name: Initialize Android Project
-        # Создаем обертку для Android
+      - name: Initialize Capacitor
         run: |
           npx cap init GhostNet com.ghost.app --web-dir www
           npx cap add android
+          
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
           
       - name: Build APK
         run: |
