@@ -7,18 +7,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Ставим Java 11 (самая стабильная для старых Gradle)
       - name: Setup Java 11
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '11'
 
-      # ПРИНУДИТЕЛЬНО СТАВИМ СТАРЫЙ GRADLE
-      - name: Setup Gradle 7.6
-        uses: gradle/gradle-build-action@v3
+      # Используем новый официальный способ настройки Gradle
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
         with:
           gradle-version: 7.6
+          cache-disabled: true # ВЫКЛЮЧАЕМ КЭШ, чтобы не падать при сбоях GitHub
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -30,10 +30,9 @@ jobs:
           npm install -g cordova
           cordova create ghost-app com.ghost.net GhostNet
           cd ghost-app
-          # Используем стабильную версию платформы
           cordova platform add android@11.0.0 --no-telemetry
           cp ../index.html www/index.html
-          # Собираем, используя установленный Gradle 7.6
+          # Собираем APK
           cordova build android --debug --no-telemetry
 
       - name: Upload APK File
@@ -41,3 +40,4 @@ jobs:
         with:
           name: GhostNet-Official-APK
           path: ghost-app/platforms/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
