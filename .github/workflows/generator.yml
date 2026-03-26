@@ -1,44 +1,42 @@
-name: Ultimate-Fix-APK
+name: Windows-Single-EXE-Builder
 on: [push, workflow_dispatch]
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
+  build-windows:
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Java 11
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'zulu'
-          java-version: '11'
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
-        with:
-          gradle-version: 7.6
-          cache-disabled: true
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
 
-      - name: Build Real APK
+      - name: Install Nativefier
+        run: npm install -g nativefier
+
+      - name: Create App
         run: |
-          # Автоматически принимаем лицензию и ставим нужную версию build-tools
-          yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager "build-tools;32.0.0"
-          
-          # Дальше стандартная сборка, которая уже почти получилась
-          npm install -g cordova
-          cordova create ghost-app com.ghost.net GhostNet
-          cd ghost-app
-          cordova platform add android@11.0.0 --no-telemetry
-          cp ../index.html www/index.html
-          cordova build android --debug --no-telemetry
+          # Собираем приложение из твоего файла
+          # --internal-urls позволяет не открывать новые окна браузера
+          nativefier "file://${{ github.workspace }}/index.html" `
+            --name "GhostNet" `
+            --platform "windows" `
+            --arch "x64" `
+            --single-instance `
+            --internal-urls ".*" `
+            --overwrite
+            
+      - name: Pack to Single EXE
+        shell: powershell
+        run: |
+          # Мы берем папку с билдом и создаем один архив, 
+          # но переименовываем его в .exe (или оставляем ZIP, если хочешь именно один файл)
+          # Самый чистый вариант для GitHub - это Portable ZIP, внутри которого один EXE
+          Compress-Archive -Path "GhostNet-win32-x64\*" -DestinationPath "GhostNet_Installer.zip"
 
-      - name: Upload APK File
+      - name: Upload Finished EXE
         uses: actions/upload-artifact@v4
         with:
-          name: GhostNet-Official-APK
-          path: ghost-app/platforms/android/app/build/outputs/apk/debug/app-debug.apk
+          name: GhostNet-Windows-App
+          path: GhostNet_Installer.zip
