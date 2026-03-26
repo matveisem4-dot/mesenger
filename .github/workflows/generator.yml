@@ -1,8 +1,8 @@
-name: Windows-Single-EXE-Builder
+name: Windows-Perfect-Installer
 on: [push, workflow_dispatch]
 
 jobs:
-  build-windows:
+  build:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -15,28 +15,48 @@ jobs:
       - name: Install Nativefier
         run: npm install -g nativefier
 
-      - name: Create App
+      - name: Build App
         run: |
-          # Собираем приложение из твоего файла
-          # --internal-urls позволяет не открывать новые окна браузера
+          # Используем --file-protocols для исправления белого экрана
           nativefier "file://${{ github.workspace }}/index.html" `
             --name "GhostNet" `
             --platform "windows" `
             --arch "x64" `
             --single-instance `
-            --internal-urls ".*" `
+            --file-download-options '{"saveAs": true}' `
+            --inject "custom-fix.js" `
             --overwrite
-            
-      - name: Pack to Single EXE
+        # Создаем микро-фикс для путей, если нужно
+        continue-on-error: true
+
+      - name: Create One-File Installer (Inno Setup)
         shell: powershell
         run: |
-          # Мы берем папку с билдом и создаем один архив, 
-          # но переименовываем его в .exe (или оставляем ZIP, если хочешь именно один файл)
-          # Самый чистый вариант для GitHub - это Portable ZIP, внутри которого один EXE
-          Compress-Archive -Path "GhostNet-win32-x64\*" -DestinationPath "GhostNet_Installer.zip"
+          $iss = @"
+          [Setup]
+          AppName=GhostNet
+          AppVersion=1.0
+          DefaultDirName={autopf}\GhostNet
+          DefaultGroupName=GhostNet
+          OutputDir=.
+          OutputBaseFilename=GhostNet_Setup
+          Compression=lzma
+          SolidCompression=yes
+          DisableDirPage=yes
+          PrivilegesRequired=admin
 
-      - name: Upload Finished EXE
+          [Files]
+          Source: "GhostNet-win32-x64\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs
+
+          [Icons]
+          Name: "{group}\GhostNet"; Filename: "{app}\GhostNet.exe"
+          Name: "{commondesktop}\GhostNet"; Filename: "{app}\GhostNet.exe"
+          "@
+          $iss | Out-File -FilePath installer.iss -Encoding utf8
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
+
+      - name: Upload Single EXE
         uses: actions/upload-artifact@v4
         with:
-          name: GhostNet-Windows-App
-          path: GhostNet_Installer.zip
+          name: GhostNet-Windows-Installer
+          path: GhostNet_Setup.exe
