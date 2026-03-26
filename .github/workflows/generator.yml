@@ -1,4 +1,4 @@
-name: Windows-Pro-Installer-RU
+name: GhostNet-PC-Perfect
 on: [push, workflow_dispatch]
 
 jobs:
@@ -10,24 +10,24 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 18
 
-      - name: Build App Files
+      - name: Build Files
         run: |
           npm install -g nativefier
-          # Собираем файлы и прикручиваем иконку
+          # Собираем приложение
           nativefier "file://${{ github.workspace }}/index.html" `
             --name "GhostNet" `
             --platform "windows" `
             --arch "x64" `
             --single-instance `
             --file-protocols `
-            --icon "${{ github.workspace }}/icon.png" `
             --overwrite
 
-      - name: Create Russian Installer (Inno Setup)
+      - name: Create Russian Installer with Desktop Icon
         shell: powershell
         run: |
+          # Этот скрипт делает установщик на русском языке
           $iss = @"
           [Setup]
           AppName=GhostNet
@@ -39,7 +39,6 @@ jobs:
           OutputBaseFilename=GhostNet_Setup
           Compression=lzma
           SolidCompression=yes
-          # ВКЛЮЧАЕМ РУССКИЙ ЯЗЫК
           Languages: russian
           MessagesFile: compiler:Languages\Russian.isl
 
@@ -47,10 +46,11 @@ jobs:
           Source: "GhostNet-win32-x64\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs
 
           [Tasks]
-          Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+          Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
 
           [Icons]
           Name: "{group}\GhostNet"; Filename: "{app}\GhostNet.exe"
+          # Восклицательный знак перед {commondesktop} создает ярлык на рабочем столе
           Name: "{commondesktop}\GhostNet"; Filename: "{app}\GhostNet.exe"; Tasks: desktopicon
 
           [Run]
@@ -59,8 +59,8 @@ jobs:
           $iss | Out-File -FilePath installer.iss -Encoding utf8
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
 
-      - name: Upload EXE
+      - name: Upload Finished EXE
         uses: actions/upload-artifact@v4
         with:
-          name: GhostNet-Windows-Installer-RU
+          name: GhostNet-PC-Installer
           path: GhostNet_Setup.exe
