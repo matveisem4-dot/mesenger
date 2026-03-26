@@ -13,12 +13,16 @@ jobs:
           distribution: 'zulu'
           java-version: '11'
 
-      # Используем новый официальный способ настройки Gradle
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
         with:
           gradle-version: 7.6
-          cache-disabled: true # ВЫКЛЮЧАЕМ КЭШ, чтобы не падать при сбоях GitHub
+          cache-disabled: true
+
+      # ДОБАВЛЯЕМ НЕДОСТАЮЩИЕ ИНСТРУМЕНТЫ
+      - name: Install Android Build Tools
+        run: |
+          echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --sdk_root=$ANDROID_HOME "build-tools;32.0.0"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -40,4 +44,3 @@ jobs:
         with:
           name: GhostNet-Official-APK
           path: ghost-app/platforms/android/app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
