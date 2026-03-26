@@ -1,57 +1,27 @@
-name: Real-Binary-Builder
+name: Super-Solid-APK-Builder
 on: [push, workflow_dispatch]
 
 jobs:
-  # СОЗДАЕМ ОДИН EXE ФАЙЛ
-  build-windows:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - name: Install Nativefier
-        run: npm install -g nativefier
-      - name: Build EXE
-        run: |
-          # Собираем приложение
-          nativefier --name "GhostNet" "file://${{ github.workspace }}/index.html" --platform "windows" --arch "x64" --single-instance --internal-urls ".*"
-          # Чтобы не было кучи папок, пакуем всё в один архив (в Windows это стандарт для портативного софта)
-          # На выходе будет GhostNet.zip, внутри которого лежит рабочее приложение
-          Compress-Archive -Path "GhostNet-win32-x64\*" -DestinationPath "GhostNet_App.zip"
-      - name: Upload Windows
-        uses: actions/upload-artifact@v4
-        with:
-          name: GhostNet-Windows-EXE
-          path: GhostNet_App.zip
-
-  # СОЗДАЕМ НАСТОЯЩИЙ APK
-  build-android:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Setup Java 11
+      
+      - name: set up JDK 17
         uses: actions/setup-java@v4
         with:
-          distribution: 'zulu'
-          java-version: '11'
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Build Android APK
+        # Используем упрощенный сборщик, который не требует инициализации проектов
+        uses: tttstudios/as-build-action@v1.1
         with:
-          node-version: 18
-      - name: Build APK
-        run: |
-          npm install -g cordova
-          cordova create ghost com.ghost.net GhostNet
-          cd ghost
-          cordova platform add android --no-telemetry
-          cp ../index.html www/index.html
-          # Вот здесь происходит магия — создание .apk файла
-          cordova build android --debug --no-telemetry
-      - name: Upload Android
+          project-root: .
+          build-variant: debug
+
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: GhostNet-Android-APK
-          # Мы берем именно файл .apk, а не всю папку!
-          path: ghost/platforms/android/app/build/outputs/apk/debug/app-debug.apk
+          name: GhostNet-APK
+          path: app/build/outputs/apk/debug/*.apk
