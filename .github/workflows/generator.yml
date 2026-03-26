@@ -31,7 +31,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
-          java-version: '17' # Вернем 17, она стабильнее для Capacitor
+          java-version: '17'
           
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -42,7 +42,7 @@ jobs:
         run: |
           npm init -y
           npm install @capacitor/cli @capacitor/core @capacitor/android
-          mkdir www
+          mkdir -p www
           cp index.html www/
           
       - name: Initialize Capacitor
@@ -50,10 +50,12 @@ jobs:
           npx cap init GhostNet com.ghost.app --web-dir www
           npx cap add android
           
-      - name: Fix Duplicate Classes
-        # Этот костыль удаляет конфликтующие библиотеки Kotlin перед сборкой
+      - name: Force Java Version in Gradle
         run: |
           cd android
+          # Прописываем версию Java прямо в настройки сборки
+          echo "org.gradle.java.home=${JAVA_HOME_17_X64}" >> gradle.properties
+          # Чиним конфликты Kotlin
           echo "configurations.all { resolutionStrategy { force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22' } }" >> build.gradle
           
       - name: Build APK
