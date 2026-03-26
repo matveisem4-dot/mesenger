@@ -1,4 +1,4 @@
-name: GhostNet-PC-Fixed-Final
+name: GhostNet-PC-Perfect-Final
 on: [push, workflow_dispatch]
 
 jobs:
@@ -15,8 +15,6 @@ jobs:
       - name: Build App Files
         run: |
           npm install -g nativefier
-          # Собираем без иконки в Nativefier, чтобы не было ошибок 404
-          # Иконку мы поставим в самом установщике
           nativefier "file://${{ github.workspace }}/index.html" `
             --name "GhostNet" `
             --platform "windows" `
@@ -29,31 +27,38 @@ jobs:
       - name: Create Russian Installer
         shell: powershell
         run: |
-          # Создаем файл настроек для инсталлятора БЕЗ собаки (@), чтобы не было ошибок
-          $issContent = "[Setup]`n" +
-          "AppName=GhostNet`n" +
-          "AppVersion=1.0`n" +
-          "DefaultDirName={autopf}\GhostNet`n" +
-          "DefaultGroupName=GhostNet`n" +
-          "OutputDir=.`n" +
-          "OutputBaseFilename=GhostNet_Setup`n" +
-          "Compression=lzma`n" +
-          "SolidCompression=yes`n" +
-          "Languages: russian`n" +
-          "MessagesFile: compiler:Languages\Russian.isl`n`n" +
-          "[Files]`n" +
-          "Source: `"GhostNet-win32-x64\*`"; DestDir: `"{app}`"; Flags: recursesubdirs createallsubdirs`n`n" +
-          "[Tasks]`n" +
-          "Name: `"desktopicon`"; Description: `"{cm:CreateDesktopIcon}`"; GroupDescription: `"{cm:AdditionalIcons}`"`n`n" +
-          "[Icons]`n" +
-          "Name: `"{group}\GhostNet`"; Filename: `"{app}\GhostNet.exe`"`n" +
-          "Name: `"{commondesktop}\GhostNet`"; Filename: `"{app}\GhostNet.exe`"; Tasks: desktopicon`n`n" +
-          "[Run]`n" +
-          "Filename: `"{app}\GhostNet.exe`"; Description: `"{cm:LaunchProgram,GhostNet}`"; Flags: nowait postinstall skipifsilent"
+          # Формируем правильный ISS файл
+          $iss = @"
+          [Setup]
+          AppName=GhostNet
+          AppVersion=1.0
+          DefaultDirName={autopf}\GhostNet
+          DefaultGroupName=GhostNet
+          OutputDir=.
+          OutputBaseFilename=GhostNet_Setup
+          Compression=lzma
+          SolidCompression=yes
 
-          $issContent | Out-File -FilePath installer.iss -Encoding utf8
+          [Languages]
+          Name: "russian"; MessagesFile: "compiler:Languages\Russian.isl"
+
+          [Files]
+          Source: "GhostNet-win32-x64\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs
+
+          [Tasks]
+          Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
+
+          [Icons]
+          Name: "{group}\GhostNet"; Filename: "{app}\GhostNet.exe"
+          Name: "{commondesktop}\GhostNet"; Filename: "{app}\GhostNet.exe"; Tasks: desktopicon
+
+          [Run]
+          Filename: "{app}\GhostNet.exe"; Description: "{cm:LaunchProgram,GhostNet}"; Flags: nowait postinstall skipifsilent
+          "@
           
-          # Запуск компилятора
+          # Сохраняем строго в UTF-8 с BOM, чтобы Inno Setup не подавился кириллицей
+          [System.IO.File]::WriteAllText("$(Get-Location)\installer.iss", $iss, [System.Text.Encoding]::UTF8)
+          
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
 
       - name: Upload Final EXE
