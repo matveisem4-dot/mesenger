@@ -7,11 +7,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Java 11
+      # Ставим Java 17, потому что Gradle 9.4 её требует
+      - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
-          distribution: 'zulu'
-          java-version: '11'
+          distribution: 'temurin'
+          java-version: '17'
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -20,21 +21,17 @@ jobs:
 
       - name: Build Real APK
         run: |
-          # Устанавливаем кордову напрямую
           npm install -g cordova
-          # Создаем проект во временной папке
           cordova create ghost-app com.ghost.net GhostNet
           cd ghost-app
-          # Добавляем платформу
-          cordova platform add android --no-telemetry
-          # Копируем твой index.html в папку сборки
+          # Фиксируем версию платформы, чтобы не было конфликтов с SDK
+          cordova platform add android@12.0.0 --no-telemetry
           cp ../index.html www/index.html
-          # Запускаем сборку бинарного файла .apk
+          # Собираем APK
           cordova build android --debug --no-telemetry
 
       - name: Upload APK File
         uses: actions/upload-artifact@v4
         with:
           name: GhostNet-Official-APK
-          # Указываем прямой путь к скомпилированному файлу
           path: ghost-app/platforms/android/app/build/outputs/apk/debug/app-debug.apk
