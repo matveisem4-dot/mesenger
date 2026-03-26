@@ -2,6 +2,7 @@ name: Ultimate-Ghost-Builder
 on: [push, workflow_dispatch]
 
 jobs:
+  # Со сборкой Windows всё Ок, оставляем как есть
   build-windows:
     runs-on: windows-latest
     steps:
@@ -27,11 +28,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Setup Java 17
+      # Переходим на Java 21, так как логи требуют именно её
+      - name: Setup Java 21
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
-          java-version: '17'
+          java-version: '21'
           
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -50,13 +52,15 @@ jobs:
           npx cap init GhostNet com.ghost.app --web-dir www
           npx cap add android
           
-      - name: Force Java Version in Gradle
+      - name: Hard-Fix Android Config
         run: |
           cd android
-          # Прописываем версию Java прямо в настройки сборки
-          echo "org.gradle.java.home=${JAVA_HOME_17_X64}" >> gradle.properties
-          # Чиним конфликты Kotlin
-          echo "configurations.all { resolutionStrategy { force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22' } }" >> build.gradle
+          # Явно прописываем Java 21 и исправляем конфликты версий
+          echo "org.gradle.java.home=${JAVA_HOME_21_X64}" >> gradle.properties
+          echo "android.useAndroidX=true" >> gradle.properties
+          echo "android.enableJetifier=true" >> gradle.properties
+          # Принудительно ставим версию Kotlin, которая не глючит
+          sed -i 's/kotlin_version = .*/kotlin_version = "1.9.10"/' build.gradle
           
       - name: Build APK
         run: |
