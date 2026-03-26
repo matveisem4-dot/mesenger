@@ -2,7 +2,7 @@ name: Ultimate-Ghost-Builder
 on: [push, workflow_dispatch]
 
 jobs:
-  # СБОРКА EXE ДЛЯ WINDOWS (Обычно работает быстрее)
+  # СБОРКА ДЛЯ WINDOWS (EXE) - должна пройти без проблем
   build-windows:
     runs-on: windows-latest
     steps:
@@ -11,34 +11,37 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-      
       - name: Install Nativefier
         run: npm install -g nativefier
-      
       - name: Create EXE
         run: |
           nativefier --name "GhostNet" --platform "windows" --arch "x64" "file://${{ github.workspace }}/index.html" --single-instance
           Compress-Archive -Path "GhostNet-win32-x64" -DestinationPath "GhostNet-Windows.zip"
-
       - name: Upload EXE
         uses: actions/upload-artifact@v4
         with:
           name: GhostNet-EXE
           path: GhostNet-Windows.zip
 
-  # СБОРКА APK ДЛЯ ANDROID (Исправленная)
+  # СБОРКА ДЛЯ ANDROID (APK) - исправляем ошибку Java 21
   build-android:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu' # Самый стабильный дистрибутив для сборки
+          java-version: '21'   # Теперь версия совпадает с запросом системы
+          
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
       
-      - name: Prepare Environment
+      - name: Prepare Project
         run: |
-          # Создаем package.json, чтобы Capacitor не ругался
           npm init -y
           npm install @capacitor/cli @capacitor/core @capacitor/android
           mkdir www
@@ -48,12 +51,6 @@ jobs:
         run: |
           npx cap init GhostNet com.ghost.app --web-dir www
           npx cap add android
-          
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
           
       - name: Build APK
         run: |
