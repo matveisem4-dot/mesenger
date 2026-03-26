@@ -19,11 +19,6 @@ jobs:
           gradle-version: 7.6
           cache-disabled: true
 
-      # ДОБАВЛЯЕМ НЕДОСТАЮЩИЕ ИНСТРУМЕНТЫ
-      - name: Install Android Build Tools
-        run: |
-          echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --sdk_root=$ANDROID_HOME "build-tools;32.0.0"
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -31,12 +26,15 @@ jobs:
 
       - name: Build Real APK
         run: |
+          # Автоматически принимаем лицензию и ставим нужную версию build-tools
+          yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager "build-tools;32.0.0"
+          
+          # Дальше стандартная сборка, которая уже почти получилась
           npm install -g cordova
           cordova create ghost-app com.ghost.net GhostNet
           cd ghost-app
           cordova platform add android@11.0.0 --no-telemetry
           cp ../index.html www/index.html
-          # Собираем APK
           cordova build android --debug --no-telemetry
 
       - name: Upload APK File
