@@ -1,0 +1,50 @@
+name: Build-Ghost-Apps
+on: 
+  push:
+    branches: [main]
+  workflow_dispatch: # Позволяет запустить сборку кнопкой
+
+jobs:
+  build-pc:
+    name: Build EXE for Windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install Nativefier
+        run: npm install -g nativefier
+      - name: Generate EXE
+        # Мы превращаем твой HTML в полноценное приложение
+        run: |
+          mkdir build
+          cp index.html build/index.html
+          nativefier --name "GhostNet" "file://${{ github.workspace }}/index.html" --platform "windows" ./dist
+      - name: Upload EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: GhostNet-Windows
+          path: ./*.zip
+
+  build-android:
+    name: Build APK for Android
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - name: Build with Bubblewrap
+        run: |
+          # Этот блок подготавливает APK из твоего HTML
+          echo "Building Android Package..."
+          # В реальном репо здесь будет команда сборки через TWA или Cordova
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: GhostNet-Android
+          path: index.html # Пока сохраняем исходник, если полная сборка требует ключей подписи
